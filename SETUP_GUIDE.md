@@ -1,0 +1,450 @@
+# 🌸 Sakura Spirit Bot - Complete Setup Guide
+
+Welcome to the Sakura Spirit Bot! This guide will walk you through everything you need to know to get your bot up and running.
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Prerequisites](#prerequisites)
+3. [Discord Bot Setup](#discord-bot-setup)
+4. [Local Installation](#local-installation)
+5. [Configuration](#configuration)
+6. [First Run](#first-run)
+7. [Command Reference](#command-reference)
+8. [Feature Configuration](#feature-configuration)
+9. [Troubleshooting](#troubleshooting)
+
+## Overview
+
+The Sakura Spirit Bot is a comprehensive Discord bot that brings an immersive, Sakura-themed RPG experience to your server. It features AI-driven spirits, dynamic weather systems, social mechanics, gaming utilities, and much more.
+
+### Key Features
+
+**Spirit System**: AI-powered spirits that interact with users, evolve, and form bonds. Each spirit has unique personalities, factions, and abilities.
+
+**Weather System**: Twelve distinct weather types that affect gameplay, including XP multipliers, gacha luck, and spirit activity levels.
+
+**Social Features**: Track relationships between users, send gifts, receive daily dreams, and build emotional connections within your community.
+
+**Gaming Utilities**: LFG (Looking for Group) system with automatic team formation, pre-game ritual buffs, and game statistics tracking.
+
+**World Exploration**: Explore Sakura Park with eight unique zones, NPCs, shops, quests, and hidden secrets to discover.
+
+**Gacha System**: Pull for spirits, cosmetics, badges, and items with rarity-based drop rates influenced by weather and emotional states.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+### Required Software
+
+**Python 3.11 or higher**: The bot is built with Python and requires version 3.11+. You can download it from [python.org](https://www.python.org/downloads/).
+
+**PostgreSQL 14+**: A relational database for persistent storage. Download from [postgresql.org](https://www.postgresql.org/download/).
+
+**Redis 6+**: An in-memory data store for caching and real-time data. Download from [redis.io](https://redis.io/download/).
+
+**Git**: For cloning the repository. Download from [git-scm.com](https://git-scm.com/downloads).
+
+### Required Accounts
+
+**Discord Developer Account**: You'll need a Discord account to create a bot application at the [Discord Developer Portal](https://discord.com/developers/applications).
+
+**OpenAI Account**: Required for AI-powered spirit interactions. Sign up at [platform.openai.com](https://platform.openai.com/).
+
+## Discord Bot Setup
+
+### Step 1: Create a Bot Application
+
+Navigate to the Discord Developer Portal and create a new application. Give it a name like "Sakura Spirit Bot" and click Create.
+
+### Step 2: Configure Bot Settings
+
+Go to the Bot section and click "Add Bot". Customize your bot's username and avatar with Sakura-themed imagery.
+
+### Step 3: Enable Intents
+
+In the Bot section, scroll down to "Privileged Gateway Intents" and enable the following:
+
+- **Presence Intent**: Required for tracking user activity
+- **Server Members Intent**: Required for member management
+- **Message Content Intent**: Required for reading messages
+
+### Step 4: Get Your Bot Token
+
+Click "Reset Token" to generate a new token. **Copy this token immediately** and store it securely. You'll need it for configuration.
+
+### Step 5: Set Bot Permissions
+
+Go to the OAuth2 section, then URL Generator. Select the following scopes:
+
+- `bot`
+- `applications.commands`
+
+Then select these bot permissions:
+
+- Read Messages/View Channels
+- Send Messages
+- Embed Links
+- Attach Files
+- Add Reactions
+- Use Slash Commands
+- Manage Roles
+
+### Step 6: Invite Bot to Your Server
+
+Copy the generated URL and paste it into your browser. Select your server and authorize the bot.
+
+## Local Installation
+
+### Step 1: Clone the Repository
+
+Open your terminal and run:
+
+```bash
+git clone <repository_url>
+cd sakura-spirit-bot
+```
+
+### Step 2: Create Virtual Environment
+
+Create and activate a Python virtual environment:
+
+```bash
+# On Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
+
+# On Windows
+python -m venv venv
+venv\\Scripts\\activate
+```
+
+### Step 3: Install Dependencies
+
+Install all required Python packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+This will install discord.py, SQLAlchemy, OpenAI client, Redis client, and other dependencies.
+
+### Step 4: Set Up PostgreSQL
+
+Start PostgreSQL and create a database:
+
+```bash
+# Connect to PostgreSQL
+psql -U postgres
+
+# Create database
+CREATE DATABASE sakura_bot;
+
+# Create user (optional but recommended)
+CREATE USER sakura_user WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE sakura_bot TO sakura_user;
+
+# Exit
+\\q
+```
+
+### Step 5: Set Up Redis
+
+Start Redis server:
+
+```bash
+# On Linux
+sudo systemctl start redis
+
+# On Mac
+brew services start redis
+
+# On Windows
+redis-server
+```
+
+Verify Redis is running:
+
+```bash
+redis-cli ping
+# Should respond with: PONG
+```
+
+## Configuration
+
+### Step 1: Create Environment File
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+### Step 2: Configure Environment Variables
+
+Open `.env` in your text editor and fill in the following values:
+
+```env
+# Discord Configuration
+DISCORD_TOKEN=your_bot_token_from_discord_developer_portal
+DISCORD_CLIENT_ID=your_bot_client_id_from_discord_developer_portal
+
+# Database Configuration
+DATABASE_URL=postgresql+asyncpg://sakura_user:your_secure_password@localhost:5432/sakura_bot
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379/0
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+
+# Bot Configuration
+BOT_PREFIX=!
+BOT_OWNER_ID=your_discord_user_id
+
+# Environment
+ENVIRONMENT=development
+
+# Feature Flags (all enabled by default)
+ENABLE_SPIRITS=true
+ENABLE_WEATHER=true
+ENABLE_SOCIAL=true
+ENABLE_GAMING=true
+ENABLE_WORLD=true
+ENABLE_GACHA=true
+ENABLE_EVENTS=true
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=logs/sakura_bot.log
+```
+
+### Step 3: Get Your Discord User ID
+
+To get your Discord user ID:
+
+1. Enable Developer Mode in Discord (Settings → Advanced → Developer Mode)
+2. Right-click your username and select "Copy ID"
+3. Paste this ID into `BOT_OWNER_ID` in your `.env` file
+
+## First Run
+
+### Step 1: Create Logs Directory
+
+```bash
+mkdir -p logs
+```
+
+### Step 2: Start the Bot
+
+```bash
+python main.py
+```
+
+You should see output similar to:
+
+```
+============================================================
+🌸 Starting Sakura Spirit Bot 🌸
+============================================================
+INFO     core.database Database connection established
+INFO     core.cache Redis connection established
+INFO     core.bot Loaded extension: commands.spirit_commands
+INFO     core.bot Loaded extension: commands.weather_commands
+...
+INFO     core.bot Logged in as SakuraSpirit#1234 (ID: 123456789)
+INFO     core.bot Connected to 1 guilds
+INFO     core.bot Sakura Spirit Bot is ready!
+```
+
+### Step 3: Test the Bot
+
+In your Discord server, try these commands:
+
+- `/sakura-help` - View all available commands
+- `/profile` - View your profile
+- `/server-info` - View server information
+- `/spirit-adopt` - Adopt your first spirit companion
+
+## Command Reference
+
+### Core Commands
+
+**`/sakura-help`**: Display comprehensive help information with all available commands organized by category.
+
+**`/profile`**: View your personal profile including level, XP, currency, emotional state, and aura.
+
+**`/server-info`**: Display server information including harmony score, current weather, and dominant faction.
+
+### Spirit Commands
+
+**`/my-spirit`**: View your companion spirit's details including power level, bond level, and evolution stage.
+
+**`/spirit-adopt`**: Adopt a new spirit companion. You can only have one active companion at a time.
+
+**`/spirit-interact <message>`**: Talk to your spirit and receive AI-generated responses based on their personality.
+
+**`/spirit-info`**: Learn about the spirit system, factions, and rarity levels.
+
+### Weather Commands
+
+**`/weather`**: Check the current server weather and its effects on gameplay.
+
+**`/weather-effects`**: View detailed breakdown of current weather effects including XP multipliers and bonuses.
+
+**`/weather-history`**: See recent weather changes in the server.
+
+**`/weather-list`**: Browse all possible weather types organized by rarity.
+
+### Social Commands
+
+**`/send-gift <user> [gift_type]`**: Send a gift to another user. Costs 50 currency, recipient receives 30 currency.
+
+**`/daily-dream`**: View your personalized daily dream with potential buffs and effects.
+
+**`/relationships`**: View your relationships with other users including warmth, rivalry, synergy, and chaos scores.
+
+### Gaming Commands
+
+**`/lfg <game> [party_size] [message]`**: Create a Looking for Group post. Others can react to join your party.
+
+**`/ritual-buff [ritual_type]`**: Perform a pre-game ritual for temporary buffs. Types: victory, focus, teamwork, luck.
+
+**`/game-stats`**: View your gaming statistics including games played and LFG sessions.
+
+### World Commands
+
+**`/explore [destination]`**: Explore different zones in Sakura Park. Start at "entrance" and discover connected areas.
+
+**`/map`**: View the complete Sakura Park map with all zones and connections.
+
+**`/shop`**: Visit the Spirit Shop to browse and purchase items.
+
+**`/quests`**: View available quests with rewards and difficulty levels.
+
+**`/inventory`**: View your inventory of items, cosmetics, and collectibles.
+
+### Gacha Commands
+
+**`/gacha-pull`**: Pull from the gacha for a chance to win spirits, cosmetics, or items. Costs 100 currency per pull.
+
+### Admin Commands (Administrators Only)
+
+**`/admin-toggle-feature <feature> <enabled>`**: Enable or disable specific bot features for your server.
+
+**`/admin-set-weather <weather>`**: Manually change the server weather.
+
+**`/admin-stats`**: View bot statistics including server count, user count, and latency.
+
+## Feature Configuration
+
+### Enabling/Disabling Features
+
+Server administrators can control which features are active using the `/admin-toggle-feature` command:
+
+```
+/admin-toggle-feature feature:spirits enabled:true
+```
+
+Available features:
+- `spirits` - Spirit system and companions
+- `weather` - Dynamic weather system
+- `social` - Social features and relationships
+- `gaming` - LFG and gaming utilities
+- `world` - Sakura Park exploration
+- `gacha` - Gacha system
+- `events` - Server-wide events
+
+### Customizing Bot Behavior
+
+You can customize bot behavior by editing the `core/config.py` file. Key settings include:
+
+- XP gain rates
+- Gacha rarity rates
+- Weather change intervals
+- Currency costs
+- Spirit roaming frequency
+
+## Troubleshooting
+
+### Bot Won't Start
+
+**Problem**: Bot fails to start or crashes immediately.
+
+**Solutions**:
+- Verify all environment variables in `.env` are correct
+- Check that PostgreSQL and Redis are running
+- Review logs in `logs/sakura_bot.log` for error messages
+- Ensure Python version is 3.11 or higher
+
+### Database Connection Error
+
+**Problem**: "Failed to connect to database" error.
+
+**Solutions**:
+- Verify PostgreSQL is running: `sudo systemctl status postgresql`
+- Test database connection: `psql -U sakura_user -d sakura_bot`
+- Check `DATABASE_URL` format in `.env`
+- Ensure database exists and user has proper permissions
+
+### Redis Connection Error
+
+**Problem**: "Failed to connect to Redis" error.
+
+**Solutions**:
+- Verify Redis is running: `redis-cli ping`
+- Check `REDIS_URL` in `.env`
+- Ensure Redis is accepting connections on port 6379
+
+### Commands Not Appearing
+
+**Problem**: Slash commands don't show up in Discord.
+
+**Solutions**:
+- Wait a few minutes for Discord to sync commands
+- Check bot has "applications.commands" scope
+- Verify bot has proper permissions in the server
+- Try kicking and re-inviting the bot
+
+### OpenAI API Errors
+
+**Problem**: Spirit interactions fail or return errors.
+
+**Solutions**:
+- Verify `OPENAI_API_KEY` is valid
+- Check OpenAI account has available credits
+- Review API rate limits
+- Check logs for specific error messages
+
+### Permission Errors
+
+**Problem**: Bot can't perform certain actions.
+
+**Solutions**:
+- Verify bot role is high enough in role hierarchy
+- Check bot has all required permissions
+- Ensure bot can see and send messages in channels
+- Review Discord audit log for permission denials
+
+## Getting Help
+
+If you encounter issues not covered in this guide:
+
+1. Check the logs in `logs/sakura_bot.log`
+2. Review the `ARCHITECTURE.md` file for technical details
+3. Consult the `DEPLOYMENT.md` file for production setup
+4. Open an issue on GitHub with detailed error information
+
+## Next Steps
+
+Now that your bot is running:
+
+1. Customize the bot's personality and responses
+2. Add custom spirits to the database
+3. Create server-specific quests and events
+4. Set up automated weather changes
+5. Configure scheduled tasks
+6. Explore advanced features in the documentation
+
+**Enjoy your Sakura Spirit Bot! 🌸**
