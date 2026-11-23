@@ -327,12 +327,15 @@ ritual:active:{ritual_id}
 
 ### Environment Variables
 ```
-DISCORD_TOKEN
-OPENAI_API_KEY
-DATABASE_URL
-REDIS_URL
-ENVIRONMENT (dev/prod)
+SAKURA_BOT_DISCORD_TOKEN
+SAKURA_BOT_OPENAI_API_KEY
+SAKURA_BOT_DATABASE_URL
+SAKURA_BOT_REDIS_URL
+SAKURA_BOT_ENVIRONMENT (development/production)
 ```
+
+Variables are prefixed with the container that reads them (`SAKURA_BOT_*`,
+`POSTGRES_*`, `REDIS_*`, `PROXY_*`, `PROXY_LOGROTATE_*`).
 
 ## Development Phases
 

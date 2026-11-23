@@ -2,7 +2,7 @@
 Redis cache connection and utilities
 
 The cache is optional at runtime. When Redis is unreachable and
-``CACHE_REQUIRED`` is false, the bot keeps running in degraded mode: every
+``SAKURA_BOT_CACHE_REQUIRED`` is false, the bot keeps running in degraded mode: every
 operation becomes a no-op, the degradation is logged once and the readiness
 endpoint reports it. Nothing is hidden and nothing crashes silently.
 """
@@ -42,7 +42,7 @@ class Cache:
             self.redis = None
             self.degraded = True
             if settings.cache_required:
-                logger.exception("Redis connection failed and CACHE_REQUIRED is true")
+                logger.exception("Redis connection failed and SAKURA_BOT_CACHE_REQUIRED is true")
                 raise
             logger.warning(
                 "Redis connection failed; running in degraded cache mode. "

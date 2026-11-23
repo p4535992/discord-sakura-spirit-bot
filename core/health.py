@@ -3,7 +3,7 @@ Minimal HTTP health endpoint used by container orchestration.
 
 ``/health`` reports process liveness, ``/ready`` reports whether the bot can
 serve traffic (database reachable, required extensions loaded, cache available
-when ``CACHE_REQUIRED`` is true). No configuration value or user data is
+when ``SAKURA_BOT_CACHE_REQUIRED`` is true). No configuration value or user data is
 exposed.
 """
 import logging

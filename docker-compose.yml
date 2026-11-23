@@ -8,7 +8,7 @@ services:
     image: "postgres:${POSTGRES_VERSION}"
     container_name: sakura-postgres
     restart: always
-    mem_limit: ${MEM_LIMIT_POSTGRES}
+    mem_limit: ${POSTGRES_MEM_LIMIT}
     cpus: 1.0
     environment:
       TZ: Europe/Rome
@@ -40,15 +40,19 @@ services:
 
   redis:
     # Required by core/cache.py for LFG sessions and cooldowns. Removing this
-    # service requires CACHE_REQUIRED=false on the bot (degraded mode).
+    # service requires SAKURA_BOT_CACHE_REQUIRED=false on the bot (degraded mode).
     image: "redis:${REDIS_VERSION}"
     container_name: sakura-redis
     restart: always
-    mem_limit: ${MEM_LIMIT_REDIS}
+    mem_limit: ${REDIS_MEM_LIMIT}
     cpus: 0.25
     environment:
       TZ: Europe/Rome
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # Configuration lives in redis/config/redis.conf: no persistence, protected
+    # mode disabled because the port is not published on the host.
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./redis/config/redis.conf:/usr/local/etc/redis/redis.conf:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -69,29 +73,36 @@ services:
     image: sakura-spirit-bot:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: bot/Dockerfile
     container_name: sakura-bot
     restart: always
-    mem_limit: ${MEM_LIMIT_BOT}
+    mem_limit: ${SAKURA_BOT_MEM_LIMIT}
     cpus: 1.0
     environment:
       TZ: Europe/Rome
-      DISCORD_TOKEN: ${DISCORD_TOKEN}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
-      BOT_PREFIX: ${BOT_PREFIX}
-      BOT_OWNER_ID: ${BOT_OWNER_ID}
+      SAKURA_BOT_DISCORD_TOKEN: ${SAKURA_BOT_DISCORD_TOKEN}
+      SAKURA_BOT_DISCORD_CLIENT_ID: ${SAKURA_BOT_DISCORD_CLIENT_ID}
+      SAKURA_BOT_PREFIX: ${SAKURA_BOT_PREFIX}
+      SAKURA_BOT_OWNER_ID: ${SAKURA_BOT_OWNER_ID}
       # Built from the PostgreSQL service variables above.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      REDIS_URL: redis://redis:6379/0
-      CACHE_REQUIRED: "true"
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      ENVIRONMENT: ${ENVIRONMENT}
-      LOG_LEVEL: ${LOG_LEVEL}
-      LOG_FILE: /var/log/sakura-bot/sakura_bot.log
-      STRICT_STARTUP: "true"
-      HEALTH_SERVER_ENABLED: "true"
-      HEALTH_HOST: 0.0.0.0
-      HEALTH_PORT: "8080"
+      SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SAKURA_BOT_REDIS_URL: redis://redis:6379/0
+      SAKURA_BOT_CACHE_REQUIRED: "true"
+      SAKURA_BOT_OPENAI_API_KEY: ${SAKURA_BOT_OPENAI_API_KEY}
+      SAKURA_BOT_ENVIRONMENT: ${SAKURA_BOT_ENVIRONMENT}
+      SAKURA_BOT_LOG_LEVEL: ${SAKURA_BOT_LOG_LEVEL}
+      SAKURA_BOT_LOG_FILE: /var/log/sakura-bot/sakura_bot.log
+      SAKURA_BOT_STRICT_STARTUP: "true"
+      SAKURA_BOT_HEALTH_SERVER_ENABLED: "true"
+      SAKURA_BOT_HEALTH_HOST: "0.0.0.0"
+      SAKURA_BOT_HEALTH_PORT: "8080"
+      SAKURA_BOT_ENABLE_SPIRITS: ${SAKURA_BOT_ENABLE_SPIRITS}
+      SAKURA_BOT_ENABLE_WEATHER: ${SAKURA_BOT_ENABLE_WEATHER}
+      SAKURA_BOT_ENABLE_SOCIAL: ${SAKURA_BOT_ENABLE_SOCIAL}
+      SAKURA_BOT_ENABLE_GAMING: ${SAKURA_BOT_ENABLE_GAMING}
+      SAKURA_BOT_ENABLE_WORLD: ${SAKURA_BOT_ENABLE_WORLD}
+      SAKURA_BOT_ENABLE_GACHA: ${SAKURA_BOT_ENABLE_GACHA}
+      SAKURA_BOT_ENABLE_EVENTS: ${SAKURA_BOT_ENABLE_EVENTS}
     volumes:
       - ./logs/bot:/var/log/sakura-bot
     security_opt:
@@ -120,15 +131,15 @@ services:
       - sakura-platform
 
   proxy:
-    image: "traefik:${TRAEFIK_VERSION}"
+    image: "traefik:${PROXY_TRAEFIK_VERSION}"
     container_name: sakura-proxy
     restart: always
-    mem_limit: ${MEM_LIMIT_PROXY}
+    mem_limit: ${PROXY_MEM_LIMIT}
     cpus: 0.5
     environment:
       TZ: Europe/Rome
     ports:
-      - "${TRAEFIK_HTTPS_PORT}:443"
+      - "${PROXY_HTTPS_PORT}:443"
     volumes:
       - ./logs/proxy:/var/log/traefik
       - ./proxy/config/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -158,7 +169,7 @@ services:
       context: ./proxy-logrotate
     container_name: sakura-proxy-logrotate
     restart: always
-    mem_limit: ${MEM_LIMIT_PROXY}
+    mem_limit: ${PROXY_LOGROTATE_MEM_LIMIT}
     cpus: 0.25
     environment:
       TZ: Europe/Rome

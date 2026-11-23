@@ -58,25 +58,18 @@ cp .env.example .env
 Edit `.env` with your credentials:
 
 ```env
-# Discord Configuration
-DISCORD_TOKEN=your_bot_token_here
-DISCORD_CLIENT_ID=your_client_id_here
+# Bot container (SAKURA_BOT_ prefix)
+SAKURA_BOT_DISCORD_TOKEN=your_bot_token_here
+SAKURA_BOT_DISCORD_CLIENT_ID=your_client_id_here
+SAKURA_BOT_OPENAI_API_KEY=your_openai_api_key_here
+SAKURA_BOT_ENVIRONMENT=development
+SAKURA_BOT_PREFIX=!
+SAKURA_BOT_OWNER_ID=your_discord_user_id
 
-# Database Configuration
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/sakura_bot
-
-# Redis Configuration
-REDIS_URL=redis://localhost:6379/0
-
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Environment
-ENVIRONMENT=development
-
-# Bot Configuration
-BOT_PREFIX=!
-BOT_OWNER_ID=your_discord_user_id
+# Bot URLs: docker compose builds them for the container, set them only when
+# running main.py directly on the host.
+SAKURA_BOT_DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/sakura_bot
+SAKURA_BOT_REDIS_URL=redis://localhost:6379/0
 ```
 
 ### Step 3: Set Up Database
@@ -117,17 +110,18 @@ docker compose ps
 
 | Service | Image | Published port | Purpose |
 |---|---|---|---|
-| `bot` | built from `Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
+| `bot` | built from `bot/Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
 | `postgres` | `postgres:${POSTGRES_VERSION}` | `127.0.0.1:${POSTGRES_PORT}` | Database, bind mount `data/postgres` |
 | `redis` | `redis:${REDIS_VERSION}` | none | LFG sessions and cooldowns |
-| `proxy` | `traefik:${TRAEFIK_VERSION}` | `${TRAEFIK_HTTPS_PORT}` | TLS termination for the health endpoint |
+| `proxy` | `traefik:${PROXY_TRAEFIK_VERSION}` | `${PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
 | `proxy-logrotate` | built from `proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
 
 Operational notes:
 
-- `CACHE_REQUIRED=true` is set in `docker-compose.yml`: the bot refuses to start
-  without Redis. Remove the `redis` service only after switching the variable to
-  `false`, which enables the degraded cache mode reported by `/ready`.
+- `SAKURA_BOT_CACHE_REQUIRED=true` is set in `docker-compose.yml`: the bot refuses to
+  start without Redis. Remove the `redis` service only after switching the
+  variable to `false`, which enables the degraded cache mode reported by
+  `/ready`.
 - The bot image runs as UID 10001. On a Linux host create the log directory first
   (`mkdir -p logs/bot && sudo chown 10001:10001 logs/bot`), otherwise Docker creates
   it as root and the bot cannot write.

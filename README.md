@@ -35,10 +35,13 @@ cd discord-sakura-spirit-bot
 cp .env.example .env
 ```
 
-Replace every `CHANGE_ME` value in `.env`: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`,
-`OPENAI_API_KEY` and `POSTGRES_PASSWORD`. `BOT_OWNER_ID` is optional.
-The password must be alphanumeric because it is embedded in `DATABASE_URL`
-without escaping.
+Replace every `CHANGE_ME` value in `.env`: `SAKURA_BOT_DISCORD_TOKEN`,
+`SAKURA_BOT_DISCORD_CLIENT_ID`, `SAKURA_BOT_OPENAI_API_KEY` and
+`POSTGRES_PASSWORD`. `SAKURA_BOT_OWNER_ID` is optional. Every key is prefixed
+with the container that reads it (`SAKURA_BOT_*`, `POSTGRES_*`, `REDIS_*`,
+`PROXY_*`, `PROXY_LOGROTATE_*`), so the file stays grouped by service.
+The password must be alphanumeric because it is embedded in
+`SAKURA_BOT_DATABASE_URL` without escaping.
 
 ### 3. Start the Stack
 
@@ -78,18 +81,18 @@ pip install -r requirements-dev.txt
 python main.py
 ```
 
-With this path, uncomment `DATABASE_URL` and `REDIS_URL` in `.env` and point
-them at reachable services.
+With this path, uncomment `SAKURA_BOT_DATABASE_URL` and `SAKURA_BOT_REDIS_URL`
+in `.env` and point them at reachable services.
 
 ### 5. Run the Tests
 
 ```bash
 pytest                    # smoke and unit tests, no external service needed
-pytest -m integration     # requires SAKURA_TEST_DATABASE_URL
+pytest -m integration     # requires POSTGRES_TEST_DATABASE_URL
 ```
 
 The integration fixture drops and recreates the schema, so
-`SAKURA_TEST_DATABASE_URL` must reference a throwaway database.
+`POSTGRES_TEST_DATABASE_URL` must reference a throwaway database.
 
 ## 🤖 Usage
 
@@ -122,24 +125,30 @@ This bot is built with a modular architecture, making it easy to extend and add 
 
 ```
 /discord-sakura-spirit-bot
+├── bot/                  # Bot container: Dockerfile and container notes
+├── postgres/             # PostgreSQL container notes (env-only configuration)
+├── redis/                # Redis container: config/redis.conf
+├── proxy/                # Traefik container: static and dynamic configuration
+├── proxy-logrotate/      # Log rotation sidecar: Dockerfile, config, scripts
 ├── commands/             # Command cogs
 ├── core/                 # Bot bootstrap, config, database, cache, health endpoint
 ├── models/               # SQLAlchemy models
 ├── systems/              # Feature systems (spirits, weather)
 ├── utils/                # Embed helpers
 ├── tests/                # Pytest smoke, unit and integration tests
-├── proxy/                # Traefik static and dynamic configuration
-├── proxy-logrotate/      # Log rotation sidecar
 ├── data/                 # Local stack state, created at runtime (gitignored)
 ├── logs/                 # Runtime logs (gitignored)
 ├── .env.example          # Environment variable template
-├── Dockerfile            # Bot image, multi-stage, non-root
 ├── docker-compose.yml    # Bot, PostgreSQL, Redis, Traefik, logrotate
 ├── main.py               # Main entry point
 ├── requirements.txt      # Runtime dependencies
 ├── requirements-dev.txt  # Test and quality dependencies
 └── README.md             # This file
 ```
+
+Each container has its own folder holding its `config/`, `scripts/`,
+`Dockerfile` and a short `README.md`; the application code stays in the Python
+packages at the repository root.
 
 ## 🤝 Contributing
 

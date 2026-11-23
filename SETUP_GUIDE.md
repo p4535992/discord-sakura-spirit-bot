@@ -186,38 +186,29 @@ cp .env.example .env
 Open `.env` in your text editor and fill in the following values:
 
 ```env
-# Discord Configuration
-DISCORD_TOKEN=your_bot_token_from_discord_developer_portal
-DISCORD_CLIENT_ID=your_bot_client_id_from_discord_developer_portal
+# Bot container
+SAKURA_BOT_DISCORD_TOKEN=your_bot_token_from_discord_developer_portal
+SAKURA_BOT_DISCORD_CLIENT_ID=your_bot_client_id_from_discord_developer_portal
+SAKURA_BOT_PREFIX=!
+SAKURA_BOT_OWNER_ID=your_discord_user_id
+SAKURA_BOT_OPENAI_API_KEY=your_openai_api_key
+SAKURA_BOT_ENVIRONMENT=development
+SAKURA_BOT_LOG_LEVEL=INFO
+SAKURA_BOT_LOG_FILE=logs/sakura_bot.log
 
-# Database Configuration
-DATABASE_URL=postgresql+asyncpg://sakura_user:your_secure_password@localhost:5432/sakura_bot
-
-# Redis Configuration
-REDIS_URL=redis://localhost:6379/0
-
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-
-# Bot Configuration
-BOT_PREFIX=!
-BOT_OWNER_ID=your_discord_user_id
-
-# Environment
-ENVIRONMENT=development
+# Bot URLs: docker compose builds them for the container, set them only when
+# running main.py directly on the host.
+SAKURA_BOT_DATABASE_URL=postgresql+asyncpg://sakura_user:your_secure_password@localhost:5432/sakura_bot
+SAKURA_BOT_REDIS_URL=redis://localhost:6379/0
 
 # Feature Flags (all enabled by default)
-ENABLE_SPIRITS=true
-ENABLE_WEATHER=true
-ENABLE_SOCIAL=true
-ENABLE_GAMING=true
-ENABLE_WORLD=true
-ENABLE_GACHA=true
-ENABLE_EVENTS=true
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FILE=logs/sakura_bot.log
+SAKURA_BOT_ENABLE_SPIRITS=true
+SAKURA_BOT_ENABLE_WEATHER=true
+SAKURA_BOT_ENABLE_SOCIAL=true
+SAKURA_BOT_ENABLE_GAMING=true
+SAKURA_BOT_ENABLE_WORLD=true
+SAKURA_BOT_ENABLE_GACHA=true
+SAKURA_BOT_ENABLE_EVENTS=true
 ```
 
 ### Step 3: Get Your Discord User ID
@@ -226,7 +217,7 @@ To get your Discord user ID:
 
 1. Enable Developer Mode in Discord (Settings → Advanced → Developer Mode)
 2. Right-click your username and select "Copy ID"
-3. Paste this ID into `BOT_OWNER_ID` in your `.env` file
+3. Paste this ID into `SAKURA_BOT_OWNER_ID` in your `.env` file
 
 ## First Run
 
@@ -385,7 +376,7 @@ You can customize bot behavior by editing the `core/config.py` file. Key setting
 **Solutions**:
 - Verify PostgreSQL is running: `sudo systemctl status postgresql`
 - Test database connection: `psql -U sakura_user -d sakura_bot`
-- Check `DATABASE_URL` format in `.env`
+- Check `SAKURA_BOT_DATABASE_URL` format in `.env`
 - Ensure database exists and user has proper permissions
 
 ### Redis Connection Error
@@ -394,7 +385,7 @@ You can customize bot behavior by editing the `core/config.py` file. Key setting
 
 **Solutions**:
 - Verify Redis is running: `redis-cli ping`
-- Check `REDIS_URL` in `.env`
+- Check `SAKURA_BOT_REDIS_URL` in `.env`
 - Ensure Redis is accepting connections on port 6379
 
 ### Commands Not Appearing
@@ -412,7 +403,7 @@ You can customize bot behavior by editing the `core/config.py` file. Key setting
 **Problem**: Spirit interactions fail or return errors.
 
 **Solutions**:
-- Verify `OPENAI_API_KEY` is valid
+- Verify `SAKURA_BOT_OPENAI_API_KEY` is valid
 - Check OpenAI account has available credits
 - Review API rate limits
 - Check logs for specific error messages

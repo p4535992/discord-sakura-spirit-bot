@@ -1,29 +1,51 @@
 """Shared test configuration.
 
 ``core.config`` instantiates ``Settings`` at import time, so the environment
-must be prepared before any project module is imported. ``DATABASE_URL`` is
-always overridden: tests must never reach a real database by accident.
+must be prepared before any project module is imported.
+``SAKURA_BOT_DATABASE_URL`` is always overridden: tests must never reach a real
+database by accident.
 """
 import os
 
-# Dedicated test database; set SAKURA_TEST_DATABASE_URL to point at a
+# Dedicated test database; set POSTGRES_TEST_DATABASE_URL to point at a
 # throwaway PostgreSQL instance (for example the compose ``postgres`` service).
 TEST_DATABASE_URL = os.environ.get(
-    "SAKURA_TEST_DATABASE_URL",
+    "POSTGRES_TEST_DATABASE_URL",
     "postgresql+asyncpg://sakura:sakura@localhost:5432/sakura_test",
 )
 
-os.environ["DATABASE_URL"] = TEST_DATABASE_URL
-os.environ.setdefault("DISCORD_TOKEN", "test-token")
-os.environ.setdefault("DISCORD_CLIENT_ID", "123456789012345678")
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
-os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
-os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("LOG_LEVEL", "WARNING")
-os.environ.setdefault("LOG_FILE", "logs/test.log")
-os.environ.setdefault("CACHE_REQUIRED", "false")
-os.environ.setdefault("HEALTH_SERVER_ENABLED", "false")
-os.environ.setdefault("STRICT_STARTUP", "false")
+# Variables are set in their container-prefixed form, exactly as compose does.
+# The legacy names are removed first so a value exported in the developer shell
+# cannot take precedence over the test value.
+_CANONICAL_NAMES = (
+    "DATABASE_URL",
+    "DISCORD_TOKEN",
+    "DISCORD_CLIENT_ID",
+    "REDIS_URL",
+    "OPENAI_API_KEY",
+    "ENVIRONMENT",
+    "LOG_LEVEL",
+    "LOG_FILE",
+    "CACHE_REQUIRED",
+    "HEALTH_SERVER_ENABLED",
+    "STRICT_STARTUP",
+    "BOT_PREFIX",
+    "BOT_OWNER_ID",
+)
+for _name in _CANONICAL_NAMES:
+    os.environ.pop(_name, None)
+
+os.environ["SAKURA_BOT_DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["SAKURA_BOT_ENVIRONMENT"] = "test"
+os.environ["SAKURA_BOT_LOG_LEVEL"] = "WARNING"
+os.environ["SAKURA_BOT_LOG_FILE"] = "logs/test.log"
+os.environ["SAKURA_BOT_CACHE_REQUIRED"] = "false"
+os.environ["SAKURA_BOT_HEALTH_SERVER_ENABLED"] = "false"
+os.environ["SAKURA_BOT_STRICT_STARTUP"] = "false"
+os.environ.setdefault("SAKURA_BOT_DISCORD_TOKEN", "test-token")
+os.environ.setdefault("SAKURA_BOT_DISCORD_CLIENT_ID", "123456789012345678")
+os.environ.setdefault("SAKURA_BOT_REDIS_URL", "redis://localhost:6379/15")
+os.environ.setdefault("SAKURA_BOT_OPENAI_API_KEY", "test-openai-key")
 
 import pytest  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
