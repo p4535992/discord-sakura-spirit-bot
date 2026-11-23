@@ -3,7 +3,9 @@ Configuration management for Sakura Spirit Bot
 
 ``.env`` is loaded by ``SettingsConfigDict`` itself, so the settings object is
 the single entry point for configuration and no separate ``load_dotenv`` call
-is required.
+is required. Two locations are read, in this order: the repository root
+``.env`` (the file Compose interpolates) and ``sakura-bot/.env`` next to the
+code, which wins when both exist.
 
 ``.env`` groups variables by container (``SAKURA_BOT_*``, ``POSTGRES_*``, ...).
 Every bot setting therefore accepts both the canonical name and the container
@@ -28,7 +30,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Repository root .env first, then the optional local one next to the
+        # code: the later file wins, so sakura-bot/.env overrides the root file.
+        env_file=("../.env", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

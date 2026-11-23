@@ -57,10 +57,18 @@ code requires:
 | Container | Role |
 |---|---|
 | `sakura-bot` | The bot itself (Python 3.13, unprivileged user) |
-| `sakura-postgres` | PostgreSQL, data in `data/sakura-postgres` |
+| `sakura-postgres` | PostgreSQL, data in the `sakura-postgres-data` volume |
 | `sakura-redis` | Redis for LFG sessions and cooldowns |
 | `sakura-proxy` | Traefik on `https://localhost` with a self-signed certificate |
 | `sakura-proxy-logrotate` | Log rotation sidecar for Traefik and bot logs |
+
+Every container keeps its state in a Docker named volume of its own
+(`sakura-postgres-data`, `sakura-bot-logs`, `sakura-proxy-logs`,
+`sakura-proxy-logrotate-state`, `sakura-proxy-logrotate-logs`), so rebuilding an
+image never touches data and no host directory has to be prepared. The
+logrotate sidecar also mounts the bot and Traefik log volumes, because it
+rotates those files in place. `docker compose down` keeps the volumes,
+`docker compose down -v` deletes them.
 
 Check the health endpoints:
 
@@ -75,6 +83,7 @@ checks until PostgreSQL, Redis and the command extensions are available.
 ### 4. Run Without Docker (optional)
 
 ```bash
+cd sakura-bot
 python3.13 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -82,11 +91,13 @@ python main.py
 ```
 
 With this path, uncomment `SAKURA_BOT_DATABASE_URL` and `SAKURA_BOT_REDIS_URL`
-in `.env` and point them at reachable services.
+in the repository root `.env` and point them at reachable services: the settings
+object also reads `../.env`, so the same file serves Compose and a host run.
 
 ### 5. Run the Tests
 
 ```bash
+cd sakura-bot
 pytest                    # smoke and unit tests, no external service needed
 pytest -m integration     # requires POSTGRES_TEST_DATABASE_URL
 ```
@@ -101,62 +112,66 @@ Once the bot is running and has joined your server, you can use the slash comman
 ### Core Commands
 
 - `/sakura-help`: Displays the help message.
-- `/profile`: View your user profile.
-- `/server-info`: View information about the server.
+- `/sakura-profile`: View your user profile.
+- `/sakura-server-info`: View information about the server.
 
 ### Spirit Commands
 
-- `/my-spirit`: View your companion spirit.
-- `/spirit-adopt`: Adopt a new spirit companion.
-- `/spirit-interact`: Interact with your spirit.
+- `/sakura-my-spirit`: View your companion spirit.
+- `/sakura-spirit-adopt`: Adopt a new spirit companion.
+- `/sakura-spirit-interact`: Interact with your spirit.
 
 ### Weather Commands
 
-- `/weather`: Check the current server weather.
-- `/weather-effects`: View detailed weather effects.
+- `/sakura-weather`: Check the current server weather.
+- `/sakura-weather-effects`: View detailed weather effects.
 
 ...and many more! Explore the bot's commands to discover all the features.
 
 ## 🔧 Development
 
-This bot is built with a modular architecture, making it easy to extend and add new features. The core logic is located in the `systems/` directory, and commands are in the `commands/` directory.
+This bot is built with a modular architecture, making it easy to extend and add new features. The whole application lives in `sakura-bot/`: the core logic is in `sakura-bot/systems/` and the cogs are in `sakura-bot/commands/`.
 
 ### Project Structure
 
 ```
 /discord-sakura-spirit-bot
-├── sakura-bot/             # Bot container: Dockerfile and container notes
-├── sakura-postgres/        # PostgreSQL container notes (env-only configuration)
-├── sakura-redis/           # Redis container: config/redis.conf
-├── sakura-proxy/           # Traefik container: static and dynamic configuration
-├── sakura-proxy-logrotate/ # Log rotation sidecar: Dockerfile, config, scripts
-├── commands/               # Command cogs
-├── core/                   # Bot bootstrap, config, database, cache, health endpoint
-├── models/                 # SQLAlchemy models
-├── systems/                # Feature systems (spirits, weather)
-├── utils/                  # Embed helpers
-├── tests/                  # Pytest smoke, unit and integration tests
-├── data/                   # Local stack state, created at runtime (gitignored)
-├── logs/                   # Runtime logs (gitignored)
-├── .env.example            # Environment variable template
-├── docker-compose.yml      # Bot, PostgreSQL, Redis, Traefik, logrotate
-├── main.py                 # Main entry point
-├── requirements.txt        # Runtime dependencies
-├── requirements-dev.txt    # Test and quality dependencies
-└── README.md               # This file
+├── sakura-bot/              # Bot container: build context and application code
+│   ├── main.py              # Entry point
+│   ├── core/                # Bootstrap, config, database, cache, health endpoint
+│   ├── commands/            # Command cogs
+│   ├── models/              # SQLAlchemy models
+│   ├── systems/             # Feature systems (spirits, weather)
+│   ├── utils/               # Embed helpers
+│   ├── tests/               # Pytest smoke, unit and integration tests
+│   ├── Dockerfile           # Multi-stage image build
+│   ├── .dockerignore        # Build-context exclusions
+│   ├── requirements.txt     # Runtime dependencies
+│   ├── requirements-dev.txt # Test and quality dependencies
+│   ├── pyproject.toml       # Pytest and black configuration
+│   └── .flake8              # Lint configuration
+├── sakura-postgres/         # PostgreSQL container notes (env-only configuration)
+├── sakura-redis/            # Redis container: config/redis.conf
+├── sakura-proxy/            # Traefik container: static and dynamic configuration
+├── sakura-proxy-logrotate/  # Log rotation sidecar: Dockerfile, config, scripts
+├── .env.example             # Environment variable template
+├── docker-compose.yml       # Bot, PostgreSQL, Redis, Traefik, logrotate
+└── README.md                # This file
 ```
 
 Each container has its own folder named after it (`sakura-bot/`,
 `sakura-redis/`, ...) holding its `config/`, `scripts/`, `Dockerfile` and a
 short `README.md`. Folder name, compose service name, `container_name` and
 environment prefix always match, so `sakura-proxy` is the `sakura-proxy/`
-folder, the `sakura-proxy` service and the `PROXY_*` variables. The application
-code stays in the Python packages at the repository root.
+folder, the `sakura-proxy` service and the `PROXY_*` variables. `sakura-bot/`
+also holds the whole application (sources, tests, requirements and lint
+configuration), so it is the build context of the bot image; the repository root
+keeps only the project-level files (Compose, `.env.example`, documentation).
 
 ## 🤝 Contributing
 
-Keep the existing module layout, add tests under `tests/` and run `pytest`
-before opening a change request.
+Keep the existing module layout, add tests under `sakura-bot/tests/` and run
+`pytest` from `sakura-bot/` before opening a change request.
 
 ## 📄 License
 

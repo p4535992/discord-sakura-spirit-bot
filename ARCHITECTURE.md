@@ -50,6 +50,9 @@
 
 ## Module Breakdown
 
+All module paths are relative to `sakura-bot/`, the application root and the
+image build context.
+
 ### 1. Core Modules
 
 #### Bot Core (`core/`)

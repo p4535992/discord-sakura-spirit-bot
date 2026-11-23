@@ -44,7 +44,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r sakura-bot/requirements.txt
 ```
 
 ### Step 2: Configure Environment
@@ -91,7 +91,7 @@ GRANT ALL PRIVILEGES ON DATABASE sakura_bot TO sakura_user;
 ### Step 4: Run the Bot
 
 ```bash
-python main.py
+python sakura-bot/main.py
 ```
 
 The bot will automatically create all necessary database tables on first run.
@@ -111,7 +111,7 @@ docker compose ps
 | Service | Image | Published port | Purpose |
 |---|---|---|---|
 | `sakura-bot` | built from `sakura-bot/Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
-| `sakura-postgres` | `postgres:${POSTGRES_VERSION}` | `127.0.0.1:${POSTGRES_PORT}` | Database, bind mount `data/sakura-postgres` |
+| `sakura-postgres` | `postgres:${POSTGRES_VERSION}` | `127.0.0.1:${POSTGRES_PORT}` | Database, volume `sakura-postgres-data` |
 | `sakura-redis` | `redis:${REDIS_VERSION}` | none | LFG sessions and cooldowns |
 | `sakura-proxy` | `traefik:${PROXY_TRAEFIK_VERSION}` | `${PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
 | `sakura-proxy-logrotate` | built from `sakura-proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
@@ -122,9 +122,12 @@ Operational notes:
   start without Redis. Remove the `sakura-redis` service only after switching the
   variable to `false`, which enables the degraded cache mode reported by
   `/ready`.
-- The bot image runs as UID 10001. On a Linux host create the log directory first
-  (`mkdir -p logs/sakura-bot && sudo chown 10001:10001 logs/sakura-bot`), otherwise Docker creates
-  it as root and the bot cannot write.
+- Every container writes its state to a named volume (`sakura-postgres-data`,
+  `sakura-bot-logs`, `sakura-proxy-logs`, `sakura-proxy-logrotate-state`,
+  `sakura-proxy-logrotate-logs`). The volumes survive image rebuilds and
+  `docker compose down`; only `docker compose down -v` removes them. The bot
+  image creates `/var/log/sakura-bot` as UID 10001, so a fresh volume inherits
+  the right owner and no host-side `chown` is needed.
 - Traefik has no default certificate configured, so it generates a self-signed one.
   Replace it with a real certificate before exposing the endpoint.
 - The Traefik dashboard and ping endpoint are bound to the container loopback and
@@ -136,7 +139,7 @@ Day-to-day commands:
 docker compose logs -f sakura-bot
 docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
 curl -k https://localhost/health
-docker compose down          # keeps data/ and logs/
+docker compose down          # keeps the named volumes
 ```
 
 ### Option 2: Systemd Service
@@ -153,7 +156,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/sakura-spirit-bot
 Environment="PATH=/home/ubuntu/sakura-spirit-bot/venv/bin"
-ExecStart=/home/ubuntu/sakura-spirit-bot/venv/bin/python main.py
+ExecStart=/home/ubuntu/sakura-spirit-bot/venv/bin/python sakura-bot/main.py
 Restart=always
 RestartSec=10
 
@@ -195,7 +198,11 @@ Treat migration tooling as pending work rather than an available feature.
 
 ### Logging
 
-Logs are stored in the `logs/` directory. Configure log rotation:
+With Compose the bot writes to the `sakura-bot-logs` volume and Traefik to
+`sakura-proxy-logs`; the `sakura-proxy-logrotate` sidecar rotates both every 15
+minutes. When the bot runs directly on the host instead, logs go to the path in
+`SAKURA_BOT_LOG_FILE` (`logs/sakura_bot.log` by default) and need a host
+logrotate rule:
 
 ```bash
 # Create logrotate config
@@ -217,15 +224,20 @@ Add:
 
 ### Backup Database
 
-Regular backups are essential:
+Regular backups are essential. With Compose the database lives in the
+`sakura-postgres-data` volume, so dump it through the running container:
 
 ```bash
+set -a; . ./.env; set +a          # POSTGRES_USER / POSTGRES_DB
+
 # Backup PostgreSQL
-pg_dump -U sakura_user sakura_bot > backup_$(date +%Y%m%d).sql
+docker compose exec -T sakura-postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup_$(date +%Y%m%d).sql
 
 # Restore from backup
-psql -U sakura_user sakura_bot < backup_20240101.sql
+docker compose exec -T sakura-postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB" < backup_20240101.sql
 ```
+
+Keep the dumps outside the repository, on the disk that holds the backups.
 
 ### Performance Monitoring
 
@@ -306,7 +318,7 @@ git pull origin main
 source venv/bin/activate
 
 # Update dependencies
-pip install -r requirements.txt --upgrade
+pip install -r sakura-bot/requirements.txt --upgrade
 
 # Restart the bot
 sudo systemctl restart sakura-bot

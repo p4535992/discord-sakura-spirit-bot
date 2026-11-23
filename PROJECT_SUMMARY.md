@@ -53,13 +53,16 @@ The bot uses a modular cog-based command system for easy feature management. All
 
 ### Code Organization
 
-The project structure separates concerns effectively:
+The project structure separates concerns effectively; every application path
+below is relative to `sakura-bot/`, the folder that is also the image build
+context:
 
 - `core/`: Bot instance, database, cache, configuration, and services
 - `commands/`: All user-facing slash commands organized by feature
 - `systems/`: Feature logic for spirits, weather, social, gaming, world, and gacha
 - `models/`: SQLAlchemy database models
 - `utils/`: Shared utilities like embed builders and formatters
+- `tests/`: Pytest smoke, unit and integration tests
 
 ## Documentation Provided
 

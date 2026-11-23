@@ -33,8 +33,8 @@ class AdminCommands(commands.Cog):
             name="📋 Core Commands",
             value=(
                 "`/sakura-help` - Show this help message\n"
-                "`/profile` - View your profile\n"
-                "`/server-info` - View server information"
+                "`/sakura-profile` - View your profile\n"
+                "`/sakura-server-info` - View server information"
             ),
             inline=False
         )
@@ -43,9 +43,9 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="🌸 Spirit Commands",
             value=(
-                "`/spirit-info` - View information about spirits\n"
-                "`/my-spirit` - View your companion spirit\n"
-                "`/spirit-interact` - Interact with your spirit"
+                "`/sakura-spirit-info` - View information about spirits\n"
+                "`/sakura-my-spirit` - View your companion spirit\n"
+                "`/sakura-spirit-interact` - Interact with your spirit"
             ),
             inline=False
         )
@@ -54,8 +54,8 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="🌤️ Weather Commands",
             value=(
-                "`/weather` - Check current server weather\n"
-                "`/weather-effects` - View weather effects"
+                "`/sakura-weather` - Check current server weather\n"
+                "`/sakura-weather-effects` - View weather effects"
             ),
             inline=False
         )
@@ -64,9 +64,9 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="💫 Social Commands",
             value=(
-                "`/send-gift` - Send a gift to another user\n"
-                "`/daily-dream` - View your daily dream\n"
-                "`/relationships` - View your relationships"
+                "`/sakura-send-gift` - Send a gift to another user\n"
+                "`/sakura-daily-dream` - View your daily dream\n"
+                "`/sakura-relationships` - View your relationships"
             ),
             inline=False
         )
@@ -75,8 +75,8 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="🎮 Gaming Commands",
             value=(
-                "`/lfg` - Look for group\n"
-                "`/ritual-buff` - Perform pre-game ritual"
+                "`/sakura-lfg` - Look for group\n"
+                "`/sakura-ritual-buff` - Perform pre-game ritual"
             ),
             inline=False
         )
@@ -85,9 +85,9 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="🗺️ World Commands",
             value=(
-                "`/explore` - Explore Sakura Park\n"
-                "`/shop` - Visit the shop\n"
-                "`/quests` - View available quests"
+                "`/sakura-explore` - Explore Sakura Park\n"
+                "`/sakura-shop` - Visit the shop\n"
+                "`/sakura-quests` - View available quests"
             ),
             inline=False
         )
@@ -96,8 +96,8 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="🎰 Gacha Commands",
             value=(
-                "`/gacha-pull` - Pull from the gacha\n"
-                "`/inventory` - View your inventory"
+                "`/sakura-gacha-pull` - Pull from the gacha\n"
+                "`/sakura-inventory` - View your inventory"
             ),
             inline=False
         )
@@ -106,18 +106,18 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="⚙️ Admin Commands",
             value=(
-                "`/admin-toggle-feature` - Enable/disable features\n"
-                "`/admin-set-weather` - Manually set weather\n"
-                "`/admin-stats` - View bot statistics"
+                "`/sakura-admin-toggle-feature` - Enable/disable features\n"
+                "`/sakura-admin-set-weather` - Manually set weather\n"
+                "`/sakura-admin-stats` - View bot statistics"
             ),
             inline=False
         )
         
-        embed.set_footer(text="Use /command-name to execute a command")
+        embed.set_footer(text="All commands start with /sakura-")
         
         await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="profile", description="View your Sakura Spirit profile")
+    @app_commands.command(name="sakura-profile", description="View your Sakura Spirit profile")
     async def profile(self, interaction: discord.Interaction):
         """Display user profile"""
         async with get_db_session() as session:
@@ -145,7 +145,7 @@ class AdminCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="server-info", description="View server information")
+    @app_commands.command(name="sakura-server-info", description="View server information")
     async def server_info(self, interaction: discord.Interaction):
         """Display server information"""
         if not interaction.guild:
@@ -185,7 +185,7 @@ class AdminCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="admin-toggle-feature", description="Enable or disable a bot feature")
+    @app_commands.command(name="sakura-admin-toggle-feature", description="Enable or disable a bot feature")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(feature="The feature to toggle", enabled="Enable or disable")
     async def toggle_feature(
@@ -227,7 +227,7 @@ class AdminCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="admin-set-weather", description="Manually set the server weather")
+    @app_commands.command(name="sakura-admin-set-weather", description="Manually set the server weather")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(weather="The weather type to set")
     async def set_weather(self, interaction: discord.Interaction, weather: str):
@@ -262,7 +262,7 @@ class AdminCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="admin-stats", description="View bot statistics")
+    @app_commands.command(name="sakura-admin-stats", description="View bot statistics")
     @app_commands.default_permissions(administrator=True)
     async def show_admin_stats(self, interaction: discord.Interaction):
         """Display bot statistics"""

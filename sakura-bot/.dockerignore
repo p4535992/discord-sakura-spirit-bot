@@ -1,19 +1,12 @@
-# Keep the build context small and free of secrets.
-.git
-.gitignore
-.venv
-venv
+# Build context is this directory (sakura-bot/): keep it small and secret-free.
 __pycache__
 *.py[cod]
 *.egg-info
 .pytest_cache
 .mypy_cache
 .ruff_cache
-
-# Local state and logs
-data
-logs
-*.log
+.venv
+venv
 
 # Tests and tooling are not needed inside the runtime image
 tests
@@ -23,7 +16,6 @@ requirements-dev.txt
 
 # Documentation and local configuration
 *.md
-docs
 .env
 .env.*
-!.env.example
+*.log

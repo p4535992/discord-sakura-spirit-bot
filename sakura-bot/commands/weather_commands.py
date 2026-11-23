@@ -20,7 +20,7 @@ class WeatherCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
     
-    @app_commands.command(name="weather", description="Check the current server weather")
+    @app_commands.command(name="sakura-weather", description="Check the current server weather")
     async def weather(self, interaction: discord.Interaction):
         """Display current weather"""
         if not interaction.guild:
@@ -69,7 +69,7 @@ class WeatherCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="weather-effects", description="View detailed weather effects")
+    @app_commands.command(name="sakura-weather-effects", description="View detailed weather effects")
     async def weather_effects(self, interaction: discord.Interaction):
         """Display detailed weather effects"""
         if not interaction.guild:
@@ -167,7 +167,7 @@ class WeatherCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="weather-history", description="View recent weather changes")
+    @app_commands.command(name="sakura-weather-history", description="View recent weather changes")
     async def weather_history(self, interaction: discord.Interaction):
         """Display weather history"""
         if not interaction.guild:
@@ -218,7 +218,7 @@ class WeatherCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="weather-list", description="View all possible weather types")
+    @app_commands.command(name="sakura-weather-list", description="View all possible weather types")
     async def weather_list(self, interaction: discord.Interaction):
         """Display all weather types"""
         embed = SakuraEmbed.create_base(

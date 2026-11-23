@@ -21,7 +21,8 @@ class GachaCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
     
-    @app_commands.command(name="gacha-pull", description="Pull from the gacha for a chance to win spirits or items")
+    @app_commands.command(name="sakura-gacha-pull",
+                          description="Pull from the gacha for a chance to win spirits or items")
     async def gacha_pull(self, interaction: discord.Interaction):
         """Perform a gacha pull"""
         await interaction.response.defer()

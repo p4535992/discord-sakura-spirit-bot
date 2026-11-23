@@ -21,7 +21,7 @@ class SpiritCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
     
-    @app_commands.command(name="my-spirit", description="View your companion spirit")
+    @app_commands.command(name="sakura-my-spirit", description="View your companion spirit")
     async def my_spirit(self, interaction: discord.Interaction):
         """Display user's companion spirit"""
         async with get_db_session() as session:
@@ -72,7 +72,7 @@ class SpiritCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="spirit-interact", description="Interact with your spirit companion")
+    @app_commands.command(name="sakura-spirit-interact", description="Interact with your spirit companion")
     @app_commands.describe(message="What do you want to say to your spirit?")
     async def spirit_interact(self, interaction: discord.Interaction, message: str):
         """Interact with user's spirit companion"""
@@ -146,7 +146,7 @@ class SpiritCommands(commands.Cog):
             
             await interaction.followup.send(embed=embed)
     
-    @app_commands.command(name="spirit-adopt", description="Adopt a spirit companion")
+    @app_commands.command(name="sakura-spirit-adopt", description="Adopt a spirit companion")
     async def spirit_adopt(self, interaction: discord.Interaction):
         """Allow user to adopt a spirit companion"""
         await interaction.response.defer()
@@ -207,7 +207,7 @@ class SpiritCommands(commands.Cog):
             
             await interaction.followup.send(embed=embed)
     
-    @app_commands.command(name="spirit-info", description="Learn about spirits and factions")
+    @app_commands.command(name="sakura-spirit-info", description="Learn about spirits and factions")
     async def spirit_info(self, interaction: discord.Interaction):
         """Display information about spirits"""
         embed = SakuraEmbed.create_base(

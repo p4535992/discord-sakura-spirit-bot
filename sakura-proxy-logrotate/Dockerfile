@@ -1,8 +1,11 @@
 # Minimal sidecar for centralised log rotation; no Docker socket access.
 FROM alpine:3.24.4
 
+# The bot log volume is shared with the bot container: create it with the bot
+# UID (10001) so the volume keeps the right owner whichever container seeds it.
 RUN apk add --no-cache logrotate tzdata \
-    && mkdir -p /var/log/traefik /var/log/sakura-bot /var/log/sakura-proxy-logrotate /var/lib/logrotate
+    && mkdir -p /var/log/traefik /var/log/sakura-bot /var/log/sakura-proxy-logrotate /var/lib/logrotate \
+    && chown 10001:10001 /var/log/sakura-bot
 
 COPY config/crontab /etc/crontabs/root
 COPY config/logrotate.conf /etc/logrotate.d/sakura-bot

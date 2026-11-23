@@ -20,7 +20,7 @@ class SocialCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
     
-    @app_commands.command(name="send-gift", description="Send a gift to another user")
+    @app_commands.command(name="sakura-send-gift", description="Send a gift to another user")
     @app_commands.describe(user="The user to send a gift to", gift_type="Type of gift to send")
     async def send_gift(
         self,
@@ -105,7 +105,7 @@ class SocialCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="daily-dream", description="View your daily dream")
+    @app_commands.command(name="sakura-daily-dream", description="View your daily dream")
     async def daily_dream(self, interaction: discord.Interaction):
         """Display user's daily dream"""
         await interaction.response.defer()
@@ -232,7 +232,7 @@ class SocialCommands(commands.Cog):
             "effects": effects
         }
     
-    @app_commands.command(name="relationships", description="View your relationships with other users")
+    @app_commands.command(name="sakura-relationships", description="View your relationships with other users")
     async def relationships(self, interaction: discord.Interaction):
         """Display user relationships"""
         if not interaction.guild:

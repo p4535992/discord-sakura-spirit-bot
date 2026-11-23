@@ -21,7 +21,7 @@ class GamingCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
     
-    @app_commands.command(name="lfg", description="Look for group to play a game")
+    @app_commands.command(name="sakura-lfg", description="Look for group to play a game")
     @app_commands.describe(
         game="The game you want to play",
         party_size="Number of players needed (including you)",
@@ -88,7 +88,7 @@ class GamingCommands(commands.Cog):
                 expire=3600  # 1 hour
             )
     
-    @app_commands.command(name="ritual-buff", description="Perform a pre-game ritual for buffs")
+    @app_commands.command(name="sakura-ritual-buff", description="Perform a pre-game ritual for buffs")
     @app_commands.describe(ritual_type="Type of ritual to perform")
     async def ritual_buff(
         self,
@@ -160,7 +160,7 @@ class GamingCommands(commands.Cog):
             # Set cooldown (30 minutes)
             await cache.set(cooldown_key, "1", expire=1800)
     
-    @app_commands.command(name="game-stats", description="View your gaming statistics")
+    @app_commands.command(name="sakura-game-stats", description="View your gaming statistics")
     async def game_stats(self, interaction: discord.Interaction):
         """Display user's gaming statistics"""
         async with get_db_session() as session:

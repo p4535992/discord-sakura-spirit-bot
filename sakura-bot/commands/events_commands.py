@@ -17,7 +17,7 @@ class EventCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="rituals", description="View or start a cooperative ritual")
+    @app_commands.command(name="sakura-rituals", description="View or start a cooperative ritual")
     async def rituals(self, interaction: discord.Interaction):
         """Display ritual information"""
         embed = SakuraEmbed.info(
@@ -26,7 +26,7 @@ class EventCommands(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="world-boss", description="Check the status of the world boss")
+    @app_commands.command(name="sakura-world-boss", description="Check the status of the world boss")
     async def world_boss(self, interaction: discord.Interaction):
         """Display world boss information"""
         embed = SakuraEmbed.info(

@@ -74,7 +74,7 @@ class WorldCommands(commands.Cog):
             }
         }
     
-    @app_commands.command(name="explore", description="Explore Sakura Park")
+    @app_commands.command(name="sakura-explore", description="Explore Sakura Park")
     @app_commands.describe(destination="The zone you want to explore")
     async def explore(self, interaction: discord.Interaction, destination: str = "entrance"):
         """Explore a zone in Sakura Park"""
@@ -135,7 +135,7 @@ class WorldCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="shop", description="Visit the Spirit Shop")
+    @app_commands.command(name="sakura-shop", description="Visit the Spirit Shop")
     async def shop(self, interaction: discord.Interaction):
         """Display shop inventory"""
         async with get_db_session() as session:
@@ -177,7 +177,7 @@ class WorldCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="quests", description="View available quests")
+    @app_commands.command(name="sakura-quests", description="View available quests")
     async def quests(self, interaction: discord.Interaction):
         """Display available quests"""
         async with get_db_session() as session:
@@ -235,7 +235,7 @@ class WorldCommands(commands.Cog):
             
             await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="map", description="View the Sakura Park map")
+    @app_commands.command(name="sakura-map", description="View the Sakura Park map")
     async def map_command(self, interaction: discord.Interaction):
         """Display park map"""
         embed = SakuraEmbed.create_base(
@@ -265,7 +265,7 @@ class WorldCommands(commands.Cog):
         
         await interaction.response.send_message(embed=embed)
     
-    @app_commands.command(name="inventory", description="View your inventory")
+    @app_commands.command(name="sakura-inventory", description="View your inventory")
     async def inventory(self, interaction: discord.Interaction):
         """Display user inventory"""
         async with get_db_session() as session:

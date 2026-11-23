@@ -125,7 +125,7 @@ venv\\Scripts\\activate
 Install all required Python packages:
 
 ```bash
-pip install -r requirements.txt
+pip install -r sakura-bot/requirements.txt
 ```
 
 This will install discord.py, SQLAlchemy, OpenAI client, Redis client, and other dependencies.
@@ -221,16 +221,16 @@ To get your Discord user ID:
 
 ## First Run
 
-### Step 1: Create Logs Directory
+### Step 1: Logs Directory
 
-```bash
-mkdir -p logs
-```
+The bot creates the parent directory of `SAKURA_BOT_LOG_FILE` at startup, so no
+manual step is needed. With the default value the log file is
+`logs/sakura_bot.log`, relative to the working directory.
 
 ### Step 2: Start the Bot
 
 ```bash
-python main.py
+python sakura-bot/main.py
 ```
 
 You should see output similar to:
@@ -254,9 +254,9 @@ INFO     core.bot Sakura Spirit Bot is ready!
 In your Discord server, try these commands:
 
 - `/sakura-help` - View all available commands
-- `/profile` - View your profile
-- `/server-info` - View server information
-- `/spirit-adopt` - Adopt your first spirit companion
+- `/sakura-profile` - View your profile
+- `/sakura-server-info` - View server information
+- `/sakura-spirit-adopt` - Adopt your first spirit companion
 
 ## Command Reference
 
@@ -264,78 +264,78 @@ In your Discord server, try these commands:
 
 **`/sakura-help`**: Display comprehensive help information with all available commands organized by category.
 
-**`/profile`**: View your personal profile including level, XP, currency, emotional state, and aura.
+**`/sakura-profile`**: View your personal profile including level, XP, currency, emotional state, and aura.
 
-**`/server-info`**: Display server information including harmony score, current weather, and dominant faction.
+**`/sakura-server-info`**: Display server information including harmony score, current weather, and dominant faction.
 
 ### Spirit Commands
 
-**`/my-spirit`**: View your companion spirit's details including power level, bond level, and evolution stage.
+**`/sakura-my-spirit`**: View your companion spirit's details including power level, bond level, and evolution stage.
 
-**`/spirit-adopt`**: Adopt a new spirit companion. You can only have one active companion at a time.
+**`/sakura-spirit-adopt`**: Adopt a new spirit companion. You can only have one active companion at a time.
 
-**`/spirit-interact <message>`**: Talk to your spirit and receive AI-generated responses based on their personality.
+**`/sakura-spirit-interact <message>`**: Talk to your spirit and receive AI-generated responses based on their personality.
 
-**`/spirit-info`**: Learn about the spirit system, factions, and rarity levels.
+**`/sakura-spirit-info`**: Learn about the spirit system, factions, and rarity levels.
 
 ### Weather Commands
 
-**`/weather`**: Check the current server weather and its effects on gameplay.
+**`/sakura-weather`**: Check the current server weather and its effects on gameplay.
 
-**`/weather-effects`**: View detailed breakdown of current weather effects including XP multipliers and bonuses.
+**`/sakura-weather-effects`**: View detailed breakdown of current weather effects including XP multipliers and bonuses.
 
-**`/weather-history`**: See recent weather changes in the server.
+**`/sakura-weather-history`**: See recent weather changes in the server.
 
-**`/weather-list`**: Browse all possible weather types organized by rarity.
+**`/sakura-weather-list`**: Browse all possible weather types organized by rarity.
 
 ### Social Commands
 
-**`/send-gift <user> [gift_type]`**: Send a gift to another user. Costs 50 currency, recipient receives 30 currency.
+**`/sakura-send-gift <user> [gift_type]`**: Send a gift to another user. Costs 50 currency, recipient receives 30 currency.
 
-**`/daily-dream`**: View your personalized daily dream with potential buffs and effects.
+**`/sakura-daily-dream`**: View your personalized daily dream with potential buffs and effects.
 
-**`/relationships`**: View your relationships with other users including warmth, rivalry, synergy, and chaos scores.
+**`/sakura-relationships`**: View your relationships with other users including warmth, rivalry, synergy, and chaos scores.
 
 ### Gaming Commands
 
-**`/lfg <game> [party_size] [message]`**: Create a Looking for Group post. Others can react to join your party.
+**`/sakura-lfg <game> [party_size] [message]`**: Create a Looking for Group post. Others can react to join your party.
 
-**`/ritual-buff [ritual_type]`**: Perform a pre-game ritual for temporary buffs. Types: victory, focus, teamwork, luck.
+**`/sakura-ritual-buff [ritual_type]`**: Perform a pre-game ritual for temporary buffs. Types: victory, focus, teamwork, luck.
 
-**`/game-stats`**: View your gaming statistics including games played and LFG sessions.
+**`/sakura-game-stats`**: View your gaming statistics including games played and LFG sessions.
 
 ### World Commands
 
-**`/explore [destination]`**: Explore different zones in Sakura Park. Start at "entrance" and discover connected areas.
+**`/sakura-explore [destination]`**: Explore different zones in Sakura Park. Start at "entrance" and discover connected areas.
 
-**`/map`**: View the complete Sakura Park map with all zones and connections.
+**`/sakura-map`**: View the complete Sakura Park map with all zones and connections.
 
-**`/shop`**: Visit the Spirit Shop to browse and purchase items.
+**`/sakura-shop`**: Visit the Spirit Shop to browse and purchase items.
 
-**`/quests`**: View available quests with rewards and difficulty levels.
+**`/sakura-quests`**: View available quests with rewards and difficulty levels.
 
-**`/inventory`**: View your inventory of items, cosmetics, and collectibles.
+**`/sakura-inventory`**: View your inventory of items, cosmetics, and collectibles.
 
 ### Gacha Commands
 
-**`/gacha-pull`**: Pull from the gacha for a chance to win spirits, cosmetics, or items. Costs 100 currency per pull.
+**`/sakura-gacha-pull`**: Pull from the gacha for a chance to win spirits, cosmetics, or items. Costs 100 currency per pull.
 
 ### Admin Commands (Administrators Only)
 
-**`/admin-toggle-feature <feature> <enabled>`**: Enable or disable specific bot features for your server.
+**`/sakura-admin-toggle-feature <feature> <enabled>`**: Enable or disable specific bot features for your server.
 
-**`/admin-set-weather <weather>`**: Manually change the server weather.
+**`/sakura-admin-set-weather <weather>`**: Manually change the server weather.
 
-**`/admin-stats`**: View bot statistics including server count, user count, and latency.
+**`/sakura-admin-stats`**: View bot statistics including server count, user count, and latency.
 
 ## Feature Configuration
 
 ### Enabling/Disabling Features
 
-Server administrators can control which features are active using the `/admin-toggle-feature` command:
+Server administrators can control which features are active using the `/sakura-admin-toggle-feature` command:
 
 ```
-/admin-toggle-feature feature:spirits enabled:true
+/sakura-admin-toggle-feature feature:spirits enabled:true
 ```
 
 Available features:
