@@ -1,35 +1,23 @@
 """
-AI-driven spirit behavior engine using OpenAI
+AI-driven spirit behavior engine.
+
+Prompts and response parsing live here; the transport is chosen by
+``core.ai_provider``, so the same code runs against OpenAI in production and
+against the deterministic stub in the Discord beta.
 """
 import logging
 import json
 from typing import Optional, Dict, Any
-from openai import AsyncOpenAI
 
-from core.config import settings
+from core.ai_provider import (
+    ROAMING_MESSAGE_KIND,
+    SPIRIT_PERSONALITY_KIND,
+    SPIRIT_RESPONSE_KIND,
+    USER_EMOTION_KIND,
+    complete,
+)
 
 logger = logging.getLogger(__name__)
-
-_client: Optional[AsyncOpenAI] = None
-
-
-def _get_client() -> AsyncOpenAI:
-    """Create the OpenAI client on first use.
-
-    Building it lazily keeps module import free of network-related side effects
-    and lets tests import the module without a real API key. ``base_url`` is
-    only set when configured, so production keeps the SDK default.
-    """
-    global _client
-    if _client is None:
-        options = {
-            "api_key": settings.openai_api_key,
-            "timeout": settings.openai_timeout_seconds,
-        }
-        if settings.openai_base_url:
-            options["base_url"] = settings.openai_base_url
-        _client = AsyncOpenAI(**options)
-    return _client
 
 
 class SpiritAI:
@@ -72,18 +60,18 @@ Guidelines:
 """
         
         try:
-            response = await _get_client().chat.completions.create(
-                model=settings.openai_model,
+            content = await complete(
+                kind=SPIRIT_RESPONSE_KIND,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
+                    {"role": "user", "content": user_message},
                 ],
                 max_tokens=150,
-                temperature=0.8
+                temperature=0.8,
             )
-            
-            return response.choices[0].message.content.strip()
-        
+
+            return content.strip()
+
         except Exception:
             logger.exception("Error generating spirit response")
             return f"*{spirit_name} gazes at you silently, petals swirling around them* 🌸"
@@ -111,17 +99,20 @@ Create a JSON response with:
 Make it unique and fitting for a cherry blossom themed world."""
         
         try:
-            response = await _get_client().chat.completions.create(
-                model=settings.openai_model,
+            content = await complete(
+                kind=SPIRIT_PERSONALITY_KIND,
                 messages=[
-                    {"role": "system", "content": "You are a creative game designer. Respond only with valid JSON."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a creative game designer. Respond only with valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=300,
-                temperature=0.9
+                temperature=0.9,
             )
-            
-            content = response.choices[0].message.content.strip()
+
+            content = content.strip()
             
             # Extract JSON from response
             if "```json" in content:
@@ -193,18 +184,21 @@ appearing in the #{channel_name} channel during {weather} weather.
 Keep it under 100 characters, whimsical and engaging. Include an emoji."""
         
         try:
-            response = await _get_client().chat.completions.create(
-                model=settings.openai_model,
+            content = await complete(
+                kind=ROAMING_MESSAGE_KIND,
                 messages=[
-                    {"role": "system", "content": "You are a creative writer for a mystical Discord bot."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a creative writer for a mystical Discord bot.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=50,
-                temperature=0.9
+                temperature=0.9,
             )
-            
-            return response.choices[0].message.content.strip()
-        
+
+            return content.strip()
+
         except Exception as e:
             logger.error(f"Error generating roaming message: {e}")
             return f"🌸 *{spirit_name} appears in a swirl of cherry blossoms*"
@@ -233,20 +227,23 @@ Respond with JSON containing:
 Choose the state that best matches their emotional tone."""
         
         try:
-            response = await _get_client().chat.completions.create(
-                model=settings.openai_model,
+            content = await complete(
+                kind=USER_EMOTION_KIND,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an emotional intelligence analyzer. Respond only with valid JSON.",
+                        "content": (
+                            "You are an emotional intelligence analyzer. "
+                            "Respond only with valid JSON."
+                        ),
                     },
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=100,
-                temperature=0.5
+                temperature=0.5,
             )
-            
-            content = response.choices[0].message.content.strip()
+
+            content = content.strip()
             
             # Extract JSON
             if "```json" in content:

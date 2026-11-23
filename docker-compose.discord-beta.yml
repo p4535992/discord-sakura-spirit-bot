@@ -1,0 +1,148 @@
+# Discord beta stack: the same bot image against a *separate* Discord
+# application and a private test guild, with its own PostgreSQL, Redis, volumes
+# and networks.
+#
+# Completely separate from docker-compose.yml (production) and from the two test
+# stacks: own project name, own volumes, own credentials, no container_name and
+# no published port. The bot talks to the real Discord API and Gateway over the
+# Internet; nothing here simulates Discord, unlike the Spacebar stack.
+#
+#   Copy-Item .env.discord-beta.example .env.discord-beta    # then fill it in
+#   docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml up -d --build
+#
+# The explicit -f and --env-file are mandatory: a bare `docker compose up` would
+# start the production stack with the production .env.
+name: sakura-spirit-bot-discord-beta
+
+services:
+  beta-postgres:
+    # Same major as the production cluster (SAKURA_POSTGRES_VERSION): the schema
+    # is created by create_all, so a different major would hide upgrade issues
+    # that only appear on the real deployment.
+    image: "postgres:${SAKURA_BETA_POSTGRES_VERSION:-17-alpine}"
+    restart: unless-stopped
+    mem_limit: ${SAKURA_BETA_POSTGRES_MEM_LIMIT:-768m}
+    cpus: 0.5
+    environment:
+      TZ: Europe/Rome
+      POSTGRES_DB: ${SAKURA_BETA_POSTGRES_DB:?Set the beta database name}
+      POSTGRES_USER: ${SAKURA_BETA_POSTGRES_USER:?Set the beta database user}
+      POSTGRES_PASSWORD: ${SAKURA_BETA_POSTGRES_PASSWORD:?Set the beta database password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - beta-postgres-data:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20M"
+        max-file: "3"
+    networks:
+      - beta-private
+
+  beta-redis:
+    image: "redis:${SAKURA_BETA_REDIS_VERSION:-7-alpine}"
+    restart: unless-stopped
+    mem_limit: ${SAKURA_BETA_REDIS_MEM_LIMIT:-64m}
+    cpus: 0.25
+    environment:
+      TZ: Europe/Rome
+    # No persistence: the beta cache is disposable and a stale key must not
+    # survive a rebuild.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10M"
+        max-file: "3"
+    networks:
+      - beta-private
+
+  beta-bot:
+    image: sakura-spirit-bot:discord-beta
+    build:
+      context: ./sakura-bot
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    mem_limit: ${SAKURA_BETA_BOT_MEM_LIMIT:-512m}
+    cpus: 1.0
+    environment:
+      TZ: Europe/Rome
+      # ``discord-beta`` narrows the slash command sync to SAKURA_BOT_TEST_GUILD_ID.
+      SAKURA_BOT_ENVIRONMENT: discord-beta
+      # Explicit: a leftover platform override must not redirect this stack.
+      SAKURA_BOT_PLATFORM: discord
+      SAKURA_BOT_DISCORD_TOKEN: ${SAKURA_BETA_DISCORD_TOKEN:?Set the dedicated Discord beta bot token}
+      SAKURA_BOT_DISCORD_CLIENT_ID: ${SAKURA_BETA_DISCORD_CLIENT_ID:?Set the beta application ID}
+      SAKURA_BOT_TEST_GUILD_ID: ${SAKURA_BETA_TEST_GUILD_ID:?Set the beta guild ID}
+      SAKURA_BOT_OWNER_ID: ${SAKURA_BETA_OWNER_ID:-}
+      SAKURA_BOT_PREFIX: "${SAKURA_BETA_PREFIX:-!}"
+      # Use an alphanumeric password: it is embedded in the URL without escaping.
+      SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://${SAKURA_BETA_POSTGRES_USER}:${SAKURA_BETA_POSTGRES_PASSWORD}@beta-postgres:5432/${SAKURA_BETA_POSTGRES_DB}
+      SAKURA_BOT_REDIS_URL: redis://beta-redis:6379/0
+      SAKURA_BOT_CACHE_REQUIRED: "true"
+      # The stub provider answers inside the process: no client, no request, no
+      # credit. Set SAKURA_BETA_AI_PROVIDER=openai only with a separate key.
+      SAKURA_BOT_AI_PROVIDER: ${SAKURA_BETA_AI_PROVIDER:-stub}
+      SAKURA_BOT_OPENAI_API_KEY: ${SAKURA_BETA_OPENAI_API_KEY:-beta-stub-no-network}
+      SAKURA_BOT_STRICT_STARTUP: "true"
+      SAKURA_BOT_LOG_LEVEL: ${SAKURA_BETA_LOG_LEVEL:-INFO}
+      SAKURA_BOT_LOG_FILE: /var/log/sakura-bot/sakura_bot.log
+      SAKURA_BOT_HEALTH_SERVER_ENABLED: "true"
+      SAKURA_BOT_HEALTH_HOST: "0.0.0.0"
+      SAKURA_BOT_HEALTH_PORT: "8080"
+      SAKURA_BOT_ENABLE_SPIRITS: "true"
+      SAKURA_BOT_ENABLE_WEATHER: "true"
+      SAKURA_BOT_ENABLE_SOCIAL: "true"
+      SAKURA_BOT_ENABLE_GAMING: "true"
+      SAKURA_BOT_ENABLE_WORLD: "true"
+      SAKURA_BOT_ENABLE_GACHA: "true"
+      SAKURA_BOT_ENABLE_EVENTS: "true"
+    volumes:
+      - beta-bot-logs:/var/log/sakura-bot
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      beta-postgres:
+        condition: service_healthy
+      beta-redis:
+        condition: service_healthy
+    # No published port: the Gateway connection is outbound and both probes are
+    # read with `docker compose exec`. The image HEALTHCHECK covers /health;
+    # /ready is the only proof that Discord is actually connected.
+    networks:
+      - beta-private
+      - beta-egress
+
+volumes:
+  # Docker prefixes the real names with the project name
+  # (sakura-spirit-bot-discord-beta_<volume>), so they never collide with the
+  # production volumes. `docker compose down` keeps them, `down -v` deletes them.
+  beta-postgres-data:
+  beta-bot-logs:
+
+networks:
+  # Internal: the database and the cache cannot reach the Internet and nothing
+  # outside the stack can reach them.
+  beta-private:
+    internal: true
+  # Egress only: the bot needs the real Discord API and Gateway. Docker cannot
+  # publish ports from an internal network, so the outbound traffic uses this
+  # bridge and no inbound mapping is declared.
+  beta-egress:
+    driver: bridge

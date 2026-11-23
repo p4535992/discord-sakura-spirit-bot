@@ -367,3 +367,8 @@ AGENTS.md
 # Il modello versionabile resta .env.spacebar.example.
 /.env.spacebar
 /spacebar-beta/data/
+
+# Stack beta Discord reale: credenziali dell'app di test, mai versionate.
+# Il modello versionabile resta .env.discord-beta.example.
+/.env.discord-beta
+/.env.discord-beta.*.local

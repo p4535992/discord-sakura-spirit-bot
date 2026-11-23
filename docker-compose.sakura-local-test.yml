@@ -108,10 +108,19 @@ services:
       SAKURA_BOT_CACHE_REQUIRED: "false"
       SAKURA_BOT_HEALTH_SERVER_ENABLED: "false"
       SAKURA_BOT_STRICT_STARTUP: "false"
+      # Root of the clone for the tests that assert the repository-level files
+      # (Compose stacks, .env templates, .gitignore). Only those files are
+      # mounted, so no local secret file is exposed to the container.
+      SAKURA_REPOSITORY_ROOT: /repository
     volumes:
       # The tests always come from the clone under validation, read-only.
       # PYTHONDONTWRITEBYTECODE keeps pytest from writing bytecode there.
       - ./sakura-bot/tests:/app/tests:ro
+      # Repository-level files asserted by
+      # tests/unit/test_discord_beta_configuration.py.
+      - ./docker-compose.discord-beta.yml:/repository/docker-compose.discord-beta.yml:ro
+      - ./.env.discord-beta.example:/repository/.env.discord-beta.example:ro
+      - ./.gitignore:/repository/.gitignore:ro
     working_dir: /app
     command: ["python", "-m", "pytest", "-v"]
     security_opt:

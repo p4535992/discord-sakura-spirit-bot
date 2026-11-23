@@ -13,8 +13,26 @@ prefixed one, so the same file works for the container and for a host run.
 """
 from typing import Optional
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Environment label that turns on the Discord beta behaviour: slash commands are
+# registered on a single test guild instead of globally. Every other value keeps
+# the production behaviour, so a leftover variable cannot narrow a live
+# deployment by accident.
+DISCORD_BETA_ENVIRONMENT = "discord-beta"
+
+# AI providers. ``openai`` is the production default and the only one that opens
+# a network connection; ``stub`` answers inside the process with deterministic
+# text, for betas that must not spend credit or leak prompts.
+OPENAI_PROVIDER = "openai"
+STUB_PROVIDER = "stub"
+SUPPORTED_AI_PROVIDERS = (OPENAI_PROVIDER, STUB_PROVIDER)
+
+# Prefix of the values shipped in ``.env.discord-beta.example``. A run that still
+# carries one of them must stop before the login instead of reaching Discord with
+# a fake credential.
+PLACEHOLDER_PREFIX = "INSERISCI_"
 
 
 def _bot_env(name: str) -> AliasChoices:
@@ -59,6 +77,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SAKURA_BOT_OWNER_ID", "BOT_OWNER_ID"),
         description="Discord user ID of the bot owner, e.g. 123456789012345678.",
     )
+    test_guild_id: Optional[int] = Field(
+        default=None,
+        validation_alias=_bot_env("TEST_GUILD_ID"),
+        description=(
+            "Guild that receives the slash commands when SAKURA_BOT_ENVIRONMENT=discord-beta, "
+            "e.g. 123456789012345678."
+        ),
+    )
 
     # Platform / transport selection
     platform: str = Field(
@@ -102,10 +128,18 @@ class Settings(BaseSettings):
     )
 
     # OpenAI Configuration
-    openai_api_key: str = Field(
-        ...,
+    openai_api_key: Optional[str] = Field(
+        default=None,
         validation_alias=_bot_env("OPENAI_API_KEY"),
-        description="OpenAI API key used by the spirit AI provider.",
+        description=(
+            "OpenAI API key used by the spirit AI; required when "
+            "SAKURA_BOT_AI_PROVIDER=openai, e.g. sk-..."
+        ),
+    )
+    ai_provider: str = Field(
+        default=OPENAI_PROVIDER,
+        validation_alias=_bot_env("AI_PROVIDER"),
+        description="AI backend: openai (network) or stub (deterministic, offline), e.g. openai.",
     )
     openai_model: str = Field(
         default="gpt-4.1-mini",
@@ -265,6 +299,47 @@ class Settings(BaseSettings):
         "Stormkin"
     ]
 
+    @field_validator("ai_provider")
+    @classmethod
+    def _normalize_ai_provider(cls, value: str) -> str:
+        """Accept ``Stub`` or `` openai `` and store the canonical lowercase value."""
+        return (value or "").strip().lower()
+
+    @model_validator(mode="after")
+    def _require_openai_key_for_openai_provider(self):
+        """Keep the fail-fast contract: the network provider needs its key.
+
+        ``stub`` is the only provider that works without a key, so a beta cannot
+        start with a half-configured OpenAI client either.
+        """
+        if self.ai_provider == OPENAI_PROVIDER and not (self.openai_api_key or "").strip():
+            raise ValueError(
+                "SAKURA_BOT_OPENAI_API_KEY is required when SAKURA_BOT_AI_PROVIDER=openai"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _reject_template_placeholders(self):
+        """Refuse the ``.env`` template placeholders instead of failing at login.
+
+        ``.env.discord-beta.example`` ships ``INSERISCI_*`` values: starting with
+        one of them would reach Discord with a fake token and fail with a
+        misleading "improper token" error.
+        """
+        pending = [
+            name
+            for name, value in (
+                ("SAKURA_BOT_DISCORD_TOKEN", self.discord_token),
+                ("SAKURA_BOT_DISCORD_CLIENT_ID", self.discord_client_id),
+            )
+            if isinstance(value, str) and value.strip().upper().startswith(PLACEHOLDER_PREFIX)
+        ]
+        if pending:
+            raise ValueError(
+                "Replace the .env template placeholders before starting: " + ", ".join(pending)
+            )
+        return self
+
 
 # Global settings instance
 settings = Settings()
@@ -278,3 +353,8 @@ def is_production() -> bool:
 def is_development() -> bool:
     """Check if running in development environment"""
     return settings.environment.lower() == "development"
+
+
+def is_discord_beta() -> bool:
+    """Check if running the Discord beta environment (guild-scoped command sync)"""
+    return settings.environment.strip().lower() == DISCORD_BETA_ENVIRONMENT

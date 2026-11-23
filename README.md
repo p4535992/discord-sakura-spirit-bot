@@ -138,10 +138,10 @@ docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-
 docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml down
 ```
 
-Verified result: **128 passed, 0 skipped** in 2.1 s. The integration test
+Verified result: **156 passed, 0 skipped** in 1.7 s. The integration test
 `tests/integration/test_user_creation_postgres.py::test_user_and_stats_are_persisted`
 runs against the throwaway cluster, after `tests/support/database_guard.py` has
-verified the URL and the marker row; the host run reports 127 passed and 1
+verified the URL and the marker row; the host run reports 155 passed and 1
 skipped because that variable is absent.
 
 #### Visual check of the running bot
@@ -252,6 +252,37 @@ dispatch, initial-response embeds and the `defer()`/followup path are no longer
 in that list: they were verified through `POST /interactions` and required four
 adapter patches documented in the same file.
 
+### 6. Discord Beta Stack (optional)
+
+`docker-compose.discord-beta.yml` runs the same image against a **separate
+Discord application** and a **private test guild**, with its own PostgreSQL,
+Redis, volumes and networks. Nothing is shared with the production stack, and
+the slash commands are registered on the test guild only.
+
+```bash
+cp .env.discord-beta.example .env.discord-beta      # Windows: Copy-Item
+docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml config --quiet
+docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml up -d --build
+docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml exec -T beta-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
+docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml down
+```
+
+| Setting | Effect |
+|---|---|
+| `SAKURA_BOT_ENVIRONMENT=discord-beta` | Slash commands are synced to `SAKURA_BOT_TEST_GUILD_ID` instead of globally; without the guild ID the startup fails instead of publishing globally |
+| `SAKURA_BOT_AI_PROVIDER=stub` | Deterministic answers computed in-process: no OpenAI client, no network call, no credit |
+| `SAKURA_BOT_AI_PROVIDER=openai` | Production behaviour, allowed only with a dedicated beta key |
+
+The bot publishes no port: the Gateway connection is outbound and `/ready` is
+read with `docker compose exec`, as shown above. `-f` and `--env-file` are
+mandatory, because a bare `docker compose up` starts the production stack.
+
+The manual Discord setup (new application, token, privileged intents, private
+guild, invite scopes) and the full PowerShell walkthrough are in
+`docs/DISCORD_BETA_GUIDA_WINDOWS.md`. The online verification is **NOT
+EXECUTED**: it needs a beta token and an explicit authorization to reach
+Discord.
+
 ## 🤖 Usage
 
 Once the bot is running and has joined your server, you can use the slash commands to interact with it. Start with `/sakura-help` to see a full list of commands.
@@ -302,8 +333,13 @@ This bot is built with a modular architecture, making it easy to extend and add 
 ├── sakura-proxy/            # Traefik container: static and dynamic configuration
 ├── sakura-proxy-logrotate/  # Log rotation sidecar: Dockerfile, config, scripts
 ├── .env.example             # Environment variable template
+├── .env.discord-beta.example # Discord beta template (separate app and guild)
 ├── docker-compose.yml       # Bot, PostgreSQL, Redis, Traefik, logrotate
+├── docker-compose.discord-beta.yml # Discord beta: separate app, own DB, Redis, volumes
 ├── docker-compose.test.yml  # Throwaway PostgreSQL for the integration tests
+├── docker-compose.sakura-local-test.yml # Full suite on throwaway services
+├── docker-compose.spacebar.yml # Local Spacebar beta stack
+├── docs/                    # Beta guides and Spacebar compatibility matrix
 └── README.md                # This file
 ```
 

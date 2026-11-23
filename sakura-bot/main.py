@@ -8,6 +8,7 @@ from pathlib import Path
 
 import colorlog
 
+from core.ai_provider import AIProviderConfigurationError, validate_ai_provider
 from core.config import settings
 from core.bot import create_bot
 from core.platform import PlatformConfigurationError, apply_platform_overrides
@@ -64,8 +65,18 @@ async def main():
     logger.info("=" * 60)
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Platform: {settings.platform}")
+    logger.info(f"AI provider: {settings.ai_provider}")
     logger.info(f"Prefix: {settings.bot_prefix}")
     logger.info(f"Features enabled: Spirits={settings.enable_spirits}, Weather={settings.enable_weather}")
+
+    # Validate the AI backend before the login: a beta must never reach a
+    # provider it did not intend to use, and an unknown value must not be
+    # discovered halfway through a command.
+    try:
+        validate_ai_provider(settings)
+    except AIProviderConfigurationError as error:
+        logger.critical(f"Invalid AI provider configuration: {error}")
+        sys.exit(1)
 
     # Redirect the transport before the client exists: the REST base and the
     # gateway must be in place before the first call, and an invalid platform

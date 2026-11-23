@@ -2,15 +2,37 @@
 Main bot instance and initialization
 """
 import logging
+from typing import Optional
+
 import discord
 from discord.ext import commands
 
-from core.config import settings
+from core.config import is_discord_beta, settings
 from core.database import init_database, close_database
 from core.cache import init_cache, close_cache
 from core.health import health_server
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_command_sync_guild() -> Optional[discord.Object]:
+    """Return the guild that must receive the commands, or ``None`` for a global sync.
+
+    Only ``SAKURA_BOT_ENVIRONMENT=discord-beta`` narrows the scope: the
+    production deployment keeps the global sync even when the variable is left
+    in the environment. A beta without its guild ID fails closed instead of
+    publishing the commands globally.
+    """
+    if not is_discord_beta():
+        return None
+    if not settings.test_guild_id:
+        logger.error(
+            "Discord beta selected without SAKURA_BOT_TEST_GUILD_ID: refusing to sync globally"
+        )
+        raise RuntimeError(
+            "SAKURA_BOT_TEST_GUILD_ID is required when SAKURA_BOT_ENVIRONMENT=discord-beta"
+        )
+    return discord.Object(id=settings.test_guild_id)
 
 
 class SakuraSpiritBot(commands.Bot):
@@ -79,9 +101,13 @@ class SakuraSpiritBot(commands.Bot):
                 "Required extensions failed to load: " + ", ".join(self.startup_failures)
             )
         
+        # Resolve the sync target before the try block: a beta without its guild
+        # ID must stop the startup even when ``strict_startup`` is false.
+        sync_guild = resolve_command_sync_guild()
+
         # Sync slash commands only when the command tree is complete.
         try:
-            synced = await self.tree.sync()
+            synced = await self._sync_application_commands(sync_guild)
             logger.info("Synced %s slash commands", len(synced))
         except Exception:
             logger.exception("Failed to sync slash commands")
@@ -91,6 +117,15 @@ class SakuraSpiritBot(commands.Bot):
         # Readiness may turn true only now: the extensions are loaded and the
         # command tree has been synchronised (or the failure was tolerated).
         health_server.bootstrap_complete = True
+
+    async def _sync_application_commands(self, guild: Optional[discord.Object]) -> list:
+        """Upload the command tree globally or to the single ``guild``."""
+        if guild is None:
+            return await self.tree.sync()
+        # ``copy_global_to`` duplicates the global tree into the guild scope,
+        # which is what makes the commands appear there immediately.
+        self.tree.copy_global_to(guild=guild)
+        return await self.tree.sync(guild=guild)
     
     async def on_ready(self):
         """Called when the bot is ready"""
