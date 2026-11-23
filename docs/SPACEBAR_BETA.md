@@ -87,7 +87,15 @@ Start-Sleep -Seconds 40
 Invoke-WebRequest -Uri 'http://127.0.0.1:3002/api/v9/gateway' -UseBasicParsing
 ```
 
-La risposta attesa è `{"url":"ws://127.0.0.1:3001/"}`.
+La risposta attesa è `{"url":"ws://spacebar-gateway:3001/"}`.
+
+> **Perché l'URL interno.** `GET /gateway/bot` pubblicizza
+> `gateway.endpointPublic` e discord.py riconnette a quell'URL: se punta a
+> `ws://127.0.0.1:3001/`, il bot dentro il container entra in un ciclo
+> `Cannot connect to host 127.0.0.1:3001` e non si riprende più dopo un riavvio
+> del gateway. `init_config.py` imposta quindi l'indirizzo interno; un client
+> browser sul PC Windows va configurato a mano su `ws://127.0.0.1:3001/`
+> (`--gateway-advertised` cambia il valore pubblicizzato).
 
 ## Bootstrap del server locale (una sola volta)
 
@@ -143,6 +151,18 @@ Get-Content spacebar-beta\spike\egress_check.py -Raw | docker compose --env-file
 
 # Integrazione AI con il mock deterministico.
 Get-Content spacebar-beta\spike\ai_mock_check.py -Raw | docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml exec -T sakura-bot-beta python -
+
+# Invocazione reale di un comando, senza client web: deve arrivare un embed.
+.\.venv\Scripts\python.exe scripts\spacebar_invoke_command.py sakura-help --new-user
+```
+
+Output atteso dell'invocazione:
+
+```text
+sakura-help: POST /interactions -> HTTP 204
+new messages in #general: 1
+  from=Sakura Beta Bot 2 bot=True embeds=1
+  titles=['🌸 Sakura Spirit Bot - Help']
 ```
 
 Output atteso di `/ready`:
@@ -196,14 +216,19 @@ Dopo il reset bisogna ripetere "Primo avvio" e "Bootstrap del server locale":
 | `Invalid platform configuration: ... public service host` | Endpoint puntato a `discord.com` | Correggere `SAKURA_BOT_API_BASE_URL`; è il comportamento voluto |
 | `CommandSyncFailure ... must be array` | Adapter `contexts`/`integration_types` non applicato | Verificare che `SAKURA_BOT_PLATFORM=spacebar` |
 | `/ready` risponde 503 con `discord: false` | Gateway Spacebar non raggiungibile | Controllare `spacebar-gateway` e `SAKURA_BOT_GATEWAY_URL` |
+| Bot `Exited (1)` subito dopo `up` | Il bot è partito prima che l'API Spacebar ascoltasse | Atteso: `restart: on-failure:10` lo riavvia; se resta fermo, controllare i log di `spacebar-api` |
+| Ciclo `Cannot connect to host 127.0.0.1:3001` | `gateway.endpointPublic` punta al loopback | Rieseguire `spacebar-beta\init_config.py` e riavviare `spacebar-api` e `spacebar-gateway` |
+| Comando eseguito ma nessuna risposta nel canale | Embed rifiutato o callback vuoto | Verificare che `SAKURA_BOT_PLATFORM=spacebar` e che `core/platform.py` sia nell'immagine (`docker compose ... build sakura-bot-beta`) |
 | Dati persi dopo `down` | È stato usato `down -v` | Comportamento atteso: `-v` elimina i volumi |
 
 ## Limiti noti di questa guida
 
 - Il client web (Fermi) **non** è incluso nello stack: la documentazione
   ufficiale non fornisce un'immagine Docker e richiede una build da sorgente.
-  Senza client non è possibile verificare la resa grafica né l'invio reale di
-  un'interazione; vedi `docs/SPACEBAR_COMPATIBILITY.md`.
+  Senza client non è possibile verificare la resa grafica; l'esecuzione dei
+  comandi è invece verificabile con `scripts\spacebar_invoke_command.py`, che
+  invia lo stesso `POST /interactions` del client. Dettagli e stato per singolo
+  comando in `docs/SPACEBAR_COMPATIBILITY.md`.
 - Spacebar non implementa thread, voice/video completo, auto moderation e
   OAuth2 con scope: le funzionalità del bot che ne dipendono restano da
   verificare su Discord staging.

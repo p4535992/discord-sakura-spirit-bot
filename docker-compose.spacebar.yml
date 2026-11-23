@@ -214,7 +214,11 @@ services:
       context: ./sakura-bot
       dockerfile: Dockerfile
     image: sakura-spirit-bot-beta:local
-    restart: "no"
+    # The Spacebar images are Nix builds without a shell, so no in-container
+    # healthcheck is possible: `depends_on` can only wait for the container to
+    # start. The bot exits 1 when its first request fails, and these bounded
+    # retries cover the ~45 s Spacebar boot without hiding a real failure.
+    restart: on-failure:10
     mem_limit: ${SAKURA_BETA_BOT_MEM_LIMIT:-512m}
     environment:
       TZ: Europe/Rome

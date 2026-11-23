@@ -6,7 +6,7 @@ mode exists for the local beta stack in ``docker-compose.spacebar.yml`` and
 requires explicit endpoints, so a misconfiguration fails at startup instead of
 silently reaching discord.com.
 
-Spacebar is Discord-compatible only up to a point. Three gaps are worked around
+Spacebar is Discord-compatible only up to a point. Seven gaps are worked around
 here, each one reproduced against a running instance (see
 ``docs/SPACEBAR_COMPATIBILITY.md``):
 
@@ -15,7 +15,16 @@ here, each one reproduced against a running instance (see
   so ``DEFAULT_GATEWAY`` is the only hook;
 * Spacebar answers ``application/json; charset=utf-8`` and requires arrays for
   ``contexts``/``integration_types``, while discord.py 2.7.1 compares the header
-  with strict equality and sends ``null``.
+  with strict equality and sends ``null``;
+* ``Embed.to_dict`` always serializes ``flags``, which the Spacebar embed schema
+  rejects on the interaction callback (HTTP 400, code 50035), so a command runs
+  but its reply never reaches the channel;
+* the callback answers ``204 No Content`` while discord.py expects a JSON body,
+  so a delivered reply still raises ``TypeError`` afterwards;
+* Spacebar rejects the type-5 defer callback (HTTP 400, code 50006) and has no
+  interaction followup webhook (HTTP 404, code 10015), so a command that defers
+  before a slow call must acknowledge locally and deliver its reply as the
+  initial response.
 
 Every patch is applied only in ``spacebar`` mode and can be reverted with
 :func:`restore_platform_overrides`, which the tests use to stay order
@@ -154,6 +163,135 @@ def _patch_app_command_payload() -> None:
         cls._merge_to_array = patched
 
 
+def _patch_embed_flags() -> None:
+    """Drop the ``flags`` key that Spacebar's embed schema does not accept.
+
+    ``Embed.to_dict`` serializes every slot, including ``_flags``, so each embed
+    carries ``flags``. Spacebar validates the interaction callback with a schema
+    that rejects the extra property (HTTP 400, code 50035, ``additionalProperties``)
+    and the command reply is lost even though the command itself runs.
+    """
+    import discord.embeds as embeds_module
+
+    if "Embed.to_dict" in _ORIGINALS:
+        return
+
+    original = embeds_module.Embed.to_dict
+
+    def to_dict(self):
+        payload = original(self)
+        payload.pop("flags", None)
+        return payload
+
+    _ORIGINALS["Embed.to_dict"] = (embeds_module.Embed, "to_dict", original)
+    embeds_module.Embed.to_dict = to_dict
+
+
+def _patch_interaction_callback_response() -> None:
+    """Tolerate an empty callback body.
+
+    discord.py expects ``{"interaction": ..., "resource": ...}`` from the callback
+    request and reads ``data['interaction']``; Spacebar answers ``204 No Content``,
+    so the parsed body is an empty string and the response object raises
+    ``TypeError`` *after* the message was already delivered. The attributes are
+    filled with neutral values so callers can still inspect the result.
+    """
+    import discord.interactions as interactions_module
+
+    if "InteractionCallbackResponse._update" in _ORIGINALS:
+        return
+
+    original = interactions_module.InteractionCallbackResponse._update
+
+    def _update(self, data):
+        if not isinstance(data, dict):
+            self.id = int(self._parent.id)
+            self._thinking = False
+            self._ephemeral = False
+            self.message_id = None
+            self.activity_id = None
+            self.resource = None
+            return None
+        return original(self, data)
+
+    _ORIGINALS["InteractionCallbackResponse._update"] = (
+        interactions_module.InteractionCallbackResponse,
+        "_update",
+        original,
+    )
+    interactions_module.InteractionCallbackResponse._update = _update
+
+
+class _InitialResponseProxy:
+    """Deliver a followup through the initial interaction response.
+
+    Spacebar does not implement the interaction followup webhook (HTTP 404,
+    code 10015, "Unknown webhook"), so the initial response is the only delivery
+    channel it supports. Commands keep calling ``interaction.followup.send``: the
+    proxy forwards the same arguments to ``interaction.response.send_message``.
+    """
+
+    __slots__ = ("_interaction",)
+
+    def __init__(self, interaction: Any) -> None:
+        self._interaction = interaction
+
+    async def send(self, content: Any = None, **kwargs: Any):
+        return await self._interaction.response.send_message(content, **kwargs)
+
+
+def _patch_interaction_defer() -> None:
+    """Skip the defer callback that Spacebar rejects.
+
+    Spacebar answers HTTP 400 (code 50006, "Empty messages are not allowed") to
+    the type-5 callback discord.py sends for a non-ephemeral defer, and it has no
+    followup webhook to deliver the real reply. Commands that defer before a slow
+    call therefore acknowledge nothing and send the final message as the initial
+    response. Component and modal defers keep the library behaviour.
+    """
+    import discord.interactions as interactions_module
+    from discord.enums import InteractionType
+
+    if "InteractionResponse.defer" in _ORIGINALS:
+        return
+
+    original = interactions_module.InteractionResponse.defer
+
+    async def defer(self, *, ephemeral: bool = False, thinking: bool = False):
+        if self._response_type:
+            raise interactions_module.InteractionResponded(self._parent)
+        if self._parent.type is InteractionType.application_command:
+            return None
+        return await original(self, ephemeral=ephemeral, thinking=thinking)
+
+    _ORIGINALS["InteractionResponse.defer"] = (
+        interactions_module.InteractionResponse,
+        "defer",
+        original,
+    )
+    interactions_module.InteractionResponse.defer = defer
+
+
+def _patch_interaction_followup() -> None:
+    """Route ``interaction.followup`` through the initial response."""
+    import discord.interactions as interactions_module
+
+    if "Interaction.followup" in _ORIGINALS:
+        return
+
+    original = interactions_module.Interaction.followup
+
+    def followup(self):
+        return _InitialResponseProxy(self)
+
+    _ORIGINALS["Interaction.followup"] = (
+        interactions_module.Interaction,
+        "followup",
+        original,
+    )
+    interactions_module.Interaction.followup = property(followup)
+
+
 def apply_platform_overrides(settings: Settings) -> None:
     """Validate the platform configuration and patch the transport if needed."""
     validate_platform_settings(settings)
@@ -182,6 +320,10 @@ def apply_platform_overrides(settings: Settings) -> None:
 
     _patch_json_parsing()
     _patch_app_command_payload()
+    _patch_embed_flags()
+    _patch_interaction_callback_response()
+    _patch_interaction_defer()
+    _patch_interaction_followup()
 
     logger.info(
         "Spacebar transport active: REST %s, gateway %s, assets %s",

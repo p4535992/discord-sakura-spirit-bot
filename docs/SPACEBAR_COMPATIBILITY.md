@@ -43,6 +43,13 @@ sono fissate per digest, quindi restano riproducibili.
 | 11 | Blocco egress del bot | PASS | `discord.com`, `gateway.discord.gg`, `api.openai.com` → `gaierror` |
 | 12 | Fail-fast su endpoint pubblico | PASS | exit 1: `Invalid platform configuration: … points at a public service host ('discord.com')` |
 | 13 | AI locale deterministica | PASS | testo, JSON personalità e JSON emozione dal mock |
+| 14 | Invocazione di uno slash command (`POST /interactions`) | PASS | `POST /api/v9/interactions` → 204, il bot riceve l'evento ed esegue il comando |
+| 15 | Risposta con embed nella risposta iniziale | PASS | `sakura-help` → embed `🌸 Sakura Spirit Bot - Help` in `#general` |
+| 16 | Secondo comando sullo stesso canale | PASS | `sakura-server-info` → embed `🌸 Sakura Beta Guild` |
+| 17 | Stato scritto da un comando e riletto da un altro | PASS | `sakura-spirit-adopt` → `sakura-my-spirit` mostra `🌸 Hanami` |
+| 18 | AI locale invocata da un comando | PASS | `POST /v1/chat/completions` 200 sul mock durante `sakura-spirit-interact` |
+| 19 | Comando che chiama `defer()` prima di una risposta lenta | PASS (con adattamento I) | `sakura-spirit-adopt` e `sakura-spirit-interact` rispondono con embed |
+| 20 | Log del bot pulito durante le invocazioni | PASS | nessun `ERROR`/`Traceback` nei log dopo la sequenza di cinque invocazioni |
 
 ## Incompatibilità reali trovate (e adattate)
 
@@ -54,41 +61,58 @@ sono fissate per digest, quindi restano riproducibili.
 | D | Spacebar vieta ai bot l'endpoint inviti | `POST /invites/{code}` → `{"code":20001,"message":"Bots cannot use this endpoint"}` | il bot crea la propria guild con `POST /guilds` |
 | E | `guild.autoJoin` con `bots: true` non ha aggiunto il bot alla guild esistente | il bot non vede la guild | creazione della guild da parte del bot (punto D) |
 | F | `POST /auth/login` con utente e password risponde `Invalid login or password` anche subito dopo la registrazione | impossibile rifare il login via REST | usare il token restituito dalla registrazione |
+| G | `Embed.to_dict` serializza sempre `flags`; lo schema embed di Spacebar rifiuta la proprietà aggiuntiva | il comando viene eseguito ma la risposta muore con HTTP 400, codice 50035, `additionalProperties: flags` | `core/platform.py` rimuove `flags` dagli embed serializzati |
+| H | Il callback dell'interazione risponde `204 No Content` anche con `with_response=1`, mentre discord.py legge `data['interaction']` | il messaggio viene recapitato ma poi arriva `TypeError: string indices must be integers` | `core/platform.py` riempie gli attributi con valori neutri quando il corpo non è un oggetto |
+| I | Spacebar rifiuta il callback di defer (tipo 5) senza contenuto | HTTP 400, codice 50006, `Empty messages are not allowed`: ogni comando che fa `defer()` fallisce | `core/platform.py` salta il defer per gli application command e la risposta reale parte come risposta iniziale |
+| J | Spacebar non implementa il webhook di followup delle interazioni | `POST /webhooks/{app_id}/{token}` → HTTP 404, codice 10015, `Unknown webhook` | `core/platform.py` reindirizza `interaction.followup` verso `interaction.response` |
 
-Gli adattamenti A e B vivono in `sakura-bot/core/platform.py`, sono applicati
+Gli adattamenti A–J vivono in `sakura-bot/core/platform.py`, sono applicati
 **solo** quando `SAKURA_BOT_PLATFORM=spacebar` e sono coperti da
 `tests/unit/test_platform_config.py` e `tests/unit/test_spacebar_endpoints.py`
-(il test `test_library_rejects_charset_suffix_without_the_adapter` documenta il
-difetto originale della libreria).
+(i test `test_library_rejects_charset_suffix_without_the_adapter`,
+`test_command_payload_sends_null_without_the_adapter`,
+`test_embed_payload_keeps_flags_without_the_adapter` e
+`test_callback_response_rejects_an_empty_body_without_the_adapter` documentano
+il difetto originale della libreria).
 
 ## Comandi slash: registrazione e invocazione
 
 | Comando | Registrato su Spacebar | Invocazione reale |
 |---|---|---|
-| `sakura-help`, `sakura-profile`, `sakura-server-info` | PASS | NOT_RUN |
-| `sakura-admin-toggle-feature`, `sakura-admin-set-weather`, `sakura-admin-stats` | PASS | NOT_RUN |
-| `sakura-my-spirit`, `sakura-spirit-info`, `sakura-spirit-adopt`, `sakura-spirit-interact` | PASS | NOT_RUN |
-| `sakura-weather`, `sakura-weather-effects`, `sakura-weather-history`, `sakura-weather-list` | PASS | NOT_RUN |
+| `sakura-help` | PASS | **PASS** — embed `🌸 Sakura Spirit Bot - Help` |
+| `sakura-server-info` | PASS | **PASS** — embed `🌸 Sakura Beta Guild` |
+| `sakura-spirit-adopt` | PASS | **PASS** — embed `🎉 Spirit Companion Adopted!` |
+| `sakura-my-spirit` | PASS | **PASS** — embed `🌸 Hanami` dopo l'adozione |
+| `sakura-spirit-interact` | PASS | **PASS** — embed della risposta dello spirito |
+| `sakura-weather` | PASS | **PASS** — embed `🌤️ Weather Change: Gentle Breeze` |
+| `sakura-profile`, `sakura-admin-toggle-feature`, `sakura-admin-set-weather`, `sakura-admin-stats` | PASS | NOT_RUN |
+| `sakura-spirit-info`, `sakura-weather-effects`, `sakura-weather-history`, `sakura-weather-list` | PASS | NOT_RUN |
 | `sakura-send-gift`, `sakura-daily-dream`, `sakura-relationships` | PASS | NOT_RUN |
 | `sakura-lfg`, `sakura-ritual-buff`, `sakura-game-stats` | PASS | NOT_RUN |
 | `sakura-explore`, `sakura-shop`, `sakura-quests`, `sakura-map`, `sakura-inventory` | PASS | NOT_RUN |
 
-Totale: **25 su 25 registrati** (verificato sia dal log del bot sia via REST).
-L'invocazione reale richiede un client che invii l'interazione: senza client web
-non è stata eseguita e **non** viene dichiarata superata.
+Totale: **25 su 25 registrati** (verificato sia dal log del bot sia via REST) e
+**6 su 25 invocati davvero**, scelti perché coprono i percorsi diversi: risposta
+diretta, stato su database, AI locale, `defer()` e due cog differenti. Gli altri
+19 comandi restano `NOT_RUN`: la registrazione è verificata, l'esecuzione no.
+
+L'invocazione non richiede il client web: `scripts/spacebar_invoke_command.py`
+invia lo stesso `POST /interactions` che manda il client, con un utente locale
+usa-e-getta. Restano fuori da questa prova i comandi che richiedono permessi di
+amministratore o di moderazione, che non sono stati forzati.
 
 ## Casi protocollari non ancora verificati
 
 | Caso | Stato | Motivo |
 |---|---|---|
-| `interaction.response.send_message` | NOT_RUN | serve un client che invii l'interazione |
-| `interaction.response.defer()` + `followup.send` | NOT_RUN | idem |
-| Risposta `ephemeral=True` | NOT_RUN | idem |
-| Embed multipli e Unicode/emoji nella UI | NOT_RUN | idem |
-| Autocomplete e validazione tipi argomenti | NOT_RUN | idem |
+| `interaction.response.send_message` | **PASS** | sei comandi hanno risposto nella risposta iniziale (adattamenti G e H) |
+| `interaction.response.defer()` + `followup.send` | **PASS** (con adattamenti I e J) | il defer viene saltato e il followup reindirizzato: `sakura-spirit-adopt` e `sakura-spirit-interact` rispondono |
+| Risposta `ephemeral=True` | NOT_RUN | l'unico ramo effimero del bot richiede un contesto DM: in guild nessun comando testato lo usa |
+| Embed multipli e Unicode/emoji nella UI | PARZIALE | embed con emoji arrivano integri via REST; la resa grafica richiede il client |
+| Autocomplete e validazione tipi argomenti | PARZIALE | un'opzione stringa (`message`) è stata passata e accettata; autocomplete non usato dal bot |
 | `on_raw_reaction_add` | NOT_RUN | richiede un client che aggiunga reazioni |
 | `on_voice_state_update` | NOT_RUN | richiede voice, non supportato dal server |
-| Screenshot della GUI | NOT_RUN | client web non disponibile come immagine |
+| Screenshot della GUI | NOT_RUN | il client (Fermi) non ha immagine Docker: va compilato da sorgente, procedura nel README |
 
 ## Funzionalità dichiarate non supportate da Spacebar
 
@@ -131,7 +155,20 @@ Get-Content spacebar-beta\spike\ai_mock_check.py -Raw | docker compose --env-fil
 $token = ((Get-Content .env.spacebar | Select-String 'SPACEBAR_BOT_TOKEN=') -split '=',2)[1].Trim()
 $appId = ((Get-Content .env.spacebar | Select-String 'SPACEBAR_BOT_CLIENT_ID=') -split '=',2)[1].Trim()
 (Invoke-RestMethod -Uri "http://127.0.0.1:3002/api/v9/applications/$appId/commands" -Headers @{ Authorization = "Bot $token" }).Count
+
+# 7. Invocazione reale di un comando, senza client web.
+.\\.venv\\Scripts\\python.exe scripts\\spacebar_invoke_command.py sakura-help --new-user
+.\\.venv\\Scripts\\python.exe scripts\\spacebar_invoke_command.py sakura-spirit-adopt --new-user
+.\\.venv\\Scripts\\python.exe scripts\\spacebar_invoke_command.py sakura-my-spirit --new-user
+.\\.venv\\Scripts\\python.exe scripts\\spacebar_invoke_command.py sakura-spirit-interact --new-user --option "message=Ciao spirito"
+.\\.venv\\Scripts\\python.exe scripts\\spacebar_invoke_command.py sakura-server-info --new-user
+.\\.venv\\Scripts\\python.exe scripts\\spacebar_invoke_command.py sakura-weather --new-user
 ```
+
+Lo script stampa il numero di messaggi nuovi nel canale e, per ognuno, autore,
+numero di embed e titoli: è l'evidenza che il comando è stato eseguito e che la
+risposta è arrivata. Un comando effimero non lascia messaggi in cronologia, quindi
+per quello l'evidenza è "nessun messaggio nuovo e nessun errore nel log del bot".
 
 ## Passo successivo: Discord staging (non eseguito)
 

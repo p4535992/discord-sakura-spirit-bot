@@ -138,10 +138,10 @@ docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-
 docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml down
 ```
 
-Verified result: **120 passed, 0 skipped** in 2.3 s. The integration test
+Verified result: **128 passed, 0 skipped** in 2.1 s. The integration test
 `tests/integration/test_user_creation_postgres.py::test_user_and_stats_are_persisted`
 runs against the throwaway cluster, after `tests/support/database_guard.py` has
-verified the URL and the marker row; the host run reports 119 passed and 1
+verified the URL and the marker row; the host run reports 127 passed and 1
 skipped because that variable is absent.
 
 #### Visual check of the running bot
@@ -168,6 +168,89 @@ docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml -f docker
 The one-time Spacebar bootstrap is documented in `docs/SPACEBAR_BETA.md`; the
 verified compatibility matrix, including what is still unverified, is in
 `docs/SPACEBAR_COMPATIBILITY.md`.
+
+#### Slash commands actually executed
+
+A Discord client triggers a command by posting to `/interactions`. The script
+`scripts/spacebar_invoke_command.py` sends the same request with a throwaway
+local user, so the execution path can be verified without the web client:
+
+```bash
+.\.venv\Scripts\python.exe scripts\spacebar_invoke_command.py sakura-help --new-user
+```
+
+Verified result: **6 of the 25 registered commands executed**, each one replying
+with its embed in `#general`; the bot log shows no `ERROR` or `Traceback` during
+the five-command sequence.
+
+| Command | Reply observed |
+|---|---|
+| `sakura-help` | `🌸 Sakura Spirit Bot - Help` |
+| `sakura-server-info` | `🌸 Sakura Beta Guild` |
+| `sakura-spirit-adopt` | `🎉 Spirit Companion Adopted!` |
+| `sakura-my-spirit` | `🌸 Hanami` (state written by the previous command) |
+| `sakura-spirit-interact` | spirit reply, with `POST /v1/chat/completions` 200 on the AI mock |
+| `sakura-weather` | `🌤️ Weather Change: Gentle Breeze` |
+
+The other 19 commands are registered but not executed: their status stays
+`NOT_RUN` in `docs/SPACEBAR_COMPATIBILITY.md`.
+
+#### Spacebar client UI screenshot (not yet captured)
+
+**Status: NOT EXECUTED.** No screenshot of the Discord-like client interface
+exists in this repository. Only the probe response above was captured.
+
+The client is [Fermi](https://github.com/spacebarchat/client), a React 18 +
+Vite 6 application. It is **not** distributed as a container image: the
+following registries were checked and none of them publishes one.
+
+```
+ghcr.io/spacebarchat/client:latest         -> not found
+ghcr.io/spacebarchat/web:latest            -> not found
+ghcr.io/spacebarchat/spacebar-client:latest -> not found
+spacebarchat/client:latest                 -> not found
+```
+
+It therefore has to be built from source, which requires `pnpm >= 9` and access
+to the npm registry. The environment where the rest of this document was
+verified blocks `registry.npmjs.org`, `codeload.github.com` and
+`raw.githubusercontent.com` (connection timeouts), while `github.com` answers
+only for git references, so `pnpm install` could not run there and the build was
+not attempted.
+
+To capture the screenshot on a machine with network access:
+
+```bash
+git clone --depth 1 https://github.com/spacebarchat/client.git
+cd client
+corepack enable && corepack prepare pnpm@9 --activate
+pnpm install
+# point the client at the local stack before building:
+#   api     http://127.0.0.1:3002/api/v9
+#   gateway ws://127.0.0.1:3001
+#   cdn     http://127.0.0.1:3003
+pnpm build
+npx serve dist -l 8080
+```
+
+Then open `http://127.0.0.1:8080`, sign in with the local account created during
+the bootstrap, open the guild that contains the bot and capture the screenshot.
+
+Two points remain unverified and must be checked during that run:
+
+- **where** the client reads its endpoints (a configuration module under `src/`
+  or a `VITE_*` variable); the source was not readable from the restricted
+  environment, so the exact override point is unknown;
+- **CORS**: the client on `:8080` calls the API on `:3002`, which is a
+  cross-origin request; if the API does not send `Access-Control-Allow-Origin`,
+  both must be served from the same origin through a reverse proxy.
+
+Until that run happens, the cases still listed as `NOT_RUN` in
+`docs/SPACEBAR_COMPATIBILITY.md` (ephemeral responses, reaction events, voice,
+and the graphical rendering of the embeds) stay unverified. Interaction
+dispatch, initial-response embeds and the `defer()`/followup path are no longer
+in that list: they were verified through `POST /interactions` and required four
+adapter patches documented in the same file.
 
 ## 🤖 Usage
 
