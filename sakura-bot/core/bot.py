@@ -73,8 +73,6 @@ class SakuraSpiritBot(commands.Bot):
                 logger.exception("Optional extension failed to load: %s", extension)
         
         health_server.startup_failures = self.startup_failures
-        # Readiness may turn true only now: the extension loading is over.
-        health_server.bootstrap_complete = True
         
         if self.startup_failures and settings.strict_startup:
             raise RuntimeError(
@@ -89,6 +87,10 @@ class SakuraSpiritBot(commands.Bot):
             logger.exception("Failed to sync slash commands")
             if settings.strict_startup:
                 raise
+
+        # Readiness may turn true only now: the extensions are loaded and the
+        # command tree has been synchronised (or the failure was tolerated).
+        health_server.bootstrap_complete = True
     
     async def on_ready(self):
         """Called when the bot is ready"""
@@ -167,8 +169,29 @@ class SakuraSpiritBot(commands.Bot):
         error: discord.app_commands.AppCommandError,
     ):
         """Answer failed slash commands instead of leaving the interaction pending."""
+        if isinstance(error, discord.app_commands.NoPrivateMessage):
+            await self._answer_failed_command(
+                interaction, "❌ This command can only be used in a server."
+            )
+            return
+
+        if isinstance(error, discord.app_commands.MissingPermissions):
+            # ``has_permissions`` reads ``interaction.permissions``, which is
+            # empty in a direct message: report the real reason there.
+            if interaction.guild is None:
+                message = "❌ This command can only be used in a server."
+            else:
+                message = "❌ You need the Administrator permission to use this command."
+            await self._answer_failed_command(interaction, message)
+            return
+
         logger.error("Unhandled slash command error", exc_info=error)
-        message = "❌ An unexpected error occurred. Please try again later."
+        await self._answer_failed_command(
+            interaction, "❌ An unexpected error occurred. Please try again later."
+        )
+
+    async def _answer_failed_command(self, interaction: discord.Interaction, message: str):
+        """Deliver an ephemeral failure message without raising a second error."""
         try:
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)

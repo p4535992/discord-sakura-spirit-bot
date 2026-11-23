@@ -5,6 +5,10 @@
 # lives in tmpfs, so nothing survives `docker compose -f docker-compose.test.yml
 # down` and the application data volume `sakura-postgres-data` is never mounted.
 #
+# `sakura-postgres/test-init/01-test-marker.sql` creates the marker row that
+# `tests/support/database_guard.py` requires before dropping the schema, so a
+# cluster started any other way is refused.
+#
 #   docker compose -f docker-compose.test.yml up -d --wait
 #   export SAKURA_POSTGRES_TEST_DATABASE_URL=postgresql+asyncpg://sakura_test:sakura_test_pw@127.0.0.1:55432/sakura_test
 #   cd sakura-bot && pytest -m integration
@@ -30,6 +34,10 @@ services:
     # test data out of any Docker volume.
     tmpfs:
       - /var/lib/postgresql/data
+    volumes:
+      # Only this stack creates the marker table that the test guard requires
+      # before it is allowed to drop the schema.
+      - ./sakura-postgres/test-init:/docker-entrypoint-initdb.d:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:

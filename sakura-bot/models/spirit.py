@@ -2,7 +2,17 @@
 Spirit-related database models
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, ForeignKey, Boolean
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import relationship
 from .base import Base
 
@@ -43,8 +53,8 @@ class SpiritInteraction(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     spirit_id = Column(Integer, ForeignKey("spirits.id"), nullable=False, index=True)
-    user_discord_id = Column(Integer, nullable=False, index=True)
-    server_discord_id = Column(Integer, nullable=False, index=True)
+    user_discord_id = Column(BigInteger, nullable=False, index=True)
+    server_discord_id = Column(BigInteger, nullable=False, index=True)
     
     interaction_type = Column(String(50), nullable=False)  # greeting, quest, gift, battle, etc.
     interaction_content = Column(String(1000), nullable=True)
@@ -65,8 +75,8 @@ class SpiritRoaming(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     spirit_id = Column(Integer, ForeignKey("spirits.id"), nullable=False)
-    server_discord_id = Column(Integer, nullable=False, index=True)
-    channel_id = Column(Integer, nullable=True)
+    server_discord_id = Column(BigInteger, nullable=False, index=True)
+    channel_id = Column(BigInteger, nullable=True)
     
     # Roaming State
     current_mood = Column(String(50), default="Curious")

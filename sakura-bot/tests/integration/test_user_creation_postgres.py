@@ -1,8 +1,9 @@
 """PostgreSQL integration test for user creation.
 
-The fixture drops and recreates the whole schema, so it only runs against a
-throwaway database declared through ``SAKURA_POSTGRES_TEST_DATABASE_URL`` and
-validated by ``assert_safe_test_database_url`` before any engine is created.
+The fixture drops and recreates the whole schema, so it only runs against the
+throwaway cluster declared through ``SAKURA_POSTGRES_TEST_DATABASE_URL``. The
+URL is validated by ``assert_safe_test_database_url`` before any engine is
+created and the marker row is verified before the first DDL statement.
 
 Two outcomes are kept distinct: without the variable the test is skipped (a
 normal offline run), while a declared but unusable database fails the run
@@ -18,7 +19,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from core.services import UserService
 from models.base import Base
 from models import User, UserStats
-from tests.support.database_guard import assert_safe_test_database_url
+from tests.support.database_guard import (
+    UnsafeTestDatabaseError,
+    assert_safe_test_database_url,
+    assert_test_database_marker,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -36,9 +41,16 @@ async def postgres_session():
 
     engine = create_async_engine(TEST_DATABASE_URL)
     try:
+        # The marker row proves the cluster was started from
+        # docker-compose.test.yml; it is checked before any DDL.
+        async with engine.connect() as connection:
+            await assert_test_database_marker(connection)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
+    except UnsafeTestDatabaseError:
+        await engine.dispose()
+        raise
     except Exception as exc:  # pragma: no cover - depends on the environment
         await engine.dispose()
         pytest.fail(f"PostgreSQL test database is not usable: {exc}")

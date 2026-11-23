@@ -76,6 +76,12 @@ class SpiritCommands(commands.Cog):
     @app_commands.describe(message="What do you want to say to your spirit?")
     async def spirit_interact(self, interaction: discord.Interaction, message: str):
         """Interact with user's spirit companion"""
+        if not interaction.guild:
+            await interaction.response.send_message(
+                "This command can only be used in a server!", ephemeral=True
+            )
+            return
+
         await interaction.response.defer()
         
         async with get_db_session() as session:

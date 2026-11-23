@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from utils.embed_builder import SakuraEmbed
 from core.database import get_db_session
-from core.services import UserService
+from core.services import ServerService, UserService
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +246,14 @@ class SocialCommands(commands.Cog):
                 interaction.user.name
             )
             
+            # ``Relationship.server_id`` is a foreign key to ``servers.id``: the
+            # Discord guild id must be resolved to the internal primary key.
+            server = await ServerService.get_or_create_server(
+                session,
+                interaction.guild.id,
+                interaction.guild.name
+            )
+
             # Get relationships
             from sqlalchemy import select, or_
             from models import Relationship
@@ -258,7 +266,7 @@ class SocialCommands(commands.Cog):
                         Relationship.user_id_2 == interaction.user.id
                     )
                 )
-                .where(Relationship.server_id == interaction.guild.id)
+                .where(Relationship.server_id == server.id)
                 .order_by(Relationship.warmth_score.desc())
                 .limit(5)
             )

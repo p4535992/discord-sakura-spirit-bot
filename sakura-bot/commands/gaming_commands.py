@@ -35,6 +35,12 @@ class GamingCommands(commands.Cog):
         message: Optional[str] = None
     ):
         """Create an LFG (Looking for Group) post"""
+        if not interaction.guild:
+            await interaction.response.send_message(
+                "This command can only be used in a server!", ephemeral=True
+            )
+            return
+
         if party_size < 2 or party_size > 10:
             await interaction.response.send_message("❌ Party size must be between 2 and 10!")
             return
@@ -223,7 +229,12 @@ class GamingCommands(commands.Cog):
         if payload.emoji.name != "✅":
             return
         
-        if payload.member.bot:
+        # Raw events also fire in direct messages and for members that are not
+        # in the cache, where ``payload.member`` is None.
+        if payload.guild_id is None:
+            return
+
+        if payload.member is None or payload.member.bot:
             return
         
         # Check if this is an LFG message
@@ -250,7 +261,19 @@ class GamingCommands(commands.Cog):
         # Update message
         try:
             channel = self.bot.get_channel(payload.channel_id)
+            if channel is None:
+                logger.warning(
+                    "LFG reaction ignored: channel %s is not cached", payload.channel_id
+                )
+                return
+
             message = await channel.fetch_message(payload.message_id)
+
+            if not message.embeds:
+                logger.warning(
+                    "LFG reaction ignored: message %s has no embed", payload.message_id
+                )
+                return
             
             embed = message.embeds[0]
             

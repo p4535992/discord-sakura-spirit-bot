@@ -96,7 +96,7 @@ class AdminCommands(commands.Cog):
         embed.add_field(
             name="🎰 Gacha Commands",
             value=(
-                "`/sakura-gacha-pull` - Pull from the gacha\n"
+                "`/sakura-gacha-pull` - Coming soon: the gacha cog is not loaded yet\n"
                 "`/sakura-inventory` - View your inventory"
             ),
             inline=False
@@ -187,6 +187,7 @@ class AdminCommands(commands.Cog):
     
     @app_commands.command(name="sakura-admin-toggle-feature", description="Enable or disable a bot feature")
     @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(feature="The feature to toggle", enabled="Enable or disable")
     async def toggle_feature(
         self,
@@ -196,14 +197,17 @@ class AdminCommands(commands.Cog):
     ):
         """Toggle a bot feature for the server"""
         if not interaction.guild:
-            await interaction.response.send_message("This command can only be used in a server!")
+            await interaction.response.send_message(
+                "This command can only be used in a server!", ephemeral=True
+            )
             return
-        
+
         valid_features = ["spirits", "weather", "social", "gaming", "world", "gacha", "events"]
-        
+
         if feature.lower() not in valid_features:
             await interaction.response.send_message(
-                f"❌ Invalid feature. Valid options: {', '.join(valid_features)}"
+                f"❌ Invalid feature. Valid options: {', '.join(valid_features)}",
+                ephemeral=True
             )
             return
         
@@ -214,10 +218,12 @@ class AdminCommands(commands.Cog):
                 interaction.guild.name
             )
             
-            if not server.enabled_features:
-                server.enabled_features = {}
-            
-            server.enabled_features[feature.lower()] = enabled
+            # ``enabled_features`` is a plain JSON column: an in-place mutation is
+            # not tracked by SQLAlchemy, so the whole mapping is reassigned.
+            server.enabled_features = {
+                **(server.enabled_features or {}),
+                feature.lower(): enabled,
+            }
             await session.commit()
             
             status = "enabled" if enabled else "disabled"
@@ -229,18 +235,22 @@ class AdminCommands(commands.Cog):
     
     @app_commands.command(name="sakura-admin-set-weather", description="Manually set the server weather")
     @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(weather="The weather type to set")
     async def set_weather(self, interaction: discord.Interaction, weather: str):
         """Manually set server weather"""
         if not interaction.guild:
-            await interaction.response.send_message("This command can only be used in a server!")
+            await interaction.response.send_message(
+                "This command can only be used in a server!", ephemeral=True
+            )
             return
         
         from core.config import settings
         
         if weather not in settings.weather_types:
             await interaction.response.send_message(
-                f"❌ Invalid weather type. Valid options: {', '.join(settings.weather_types)}"
+                f"❌ Invalid weather type. Valid options: {', '.join(settings.weather_types)}",
+                ephemeral=True
             )
             return
         
@@ -264,6 +274,7 @@ class AdminCommands(commands.Cog):
     
     @app_commands.command(name="sakura-admin-stats", description="View bot statistics")
     @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def show_admin_stats(self, interaction: discord.Interaction):
         """Display bot statistics"""
         embed = SakuraEmbed.create_base(

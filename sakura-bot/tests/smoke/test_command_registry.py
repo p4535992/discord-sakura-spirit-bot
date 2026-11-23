@@ -62,3 +62,15 @@ async def test_every_command_uses_the_sakura_prefix(loaded_bot):
     """A new command without the namespace prefix must fail here, not in Discord."""
     for command in loaded_bot.tree.get_commands():
         assert command.name.startswith(COMMAND_PREFIX), command.name
+
+
+async def test_optional_cogs_are_not_registered(loaded_bot):
+    """``gacha`` and ``events`` ship in the repository but are not loaded.
+
+    The feature flags exist and default to true, so the gap is documented here
+    instead of being silently "fixed" by enabling unfinished systems.
+    """
+    registered = {command.name for command in loaded_bot.tree.get_commands()}
+
+    assert loaded_bot.optional_extensions == []
+    assert registered.isdisjoint({"sakura-gacha-pull", "sakura-rituals", "sakura-world-boss"})

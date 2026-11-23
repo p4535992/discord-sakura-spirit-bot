@@ -1,39 +1,57 @@
 """Safety guard for the destructive PostgreSQL integration tests.
 
-The integration fixture drops and recreates every table, so the target URL must
-be provably a throwaway test database. The guard runs before any engine is
-created: a misconfigured URL fails with an explicit error instead of touching
-real data. Error messages never contain the password.
+The integration fixture drops and recreates every table, so the target must be
+provably the throwaway cluster declared in ``docker-compose.test.yml``. The
+guard is fail-closed: only the exact host/port/database tuples below are
+accepted, no environment variable can widen them, and once connected the
+database must also carry the marker row that only the test stack creates.
+
+Error messages never contain the password.
 """
 
 import os
 from typing import Optional
 
+from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import ArgumentError
 
 APPLICATION_DATABASE_URL_ENV = "SAKURA_BOT_DATABASE_URL"
 TEST_DATABASE_URL_ENV = "SAKURA_POSTGRES_TEST_DATABASE_URL"
-ALLOWED_HOSTS_ENV = "SAKURA_TEST_DB_ALLOWED_HOSTS"
 
-# Hosts reachable from a developer workstation or from the test compose stack.
-DEFAULT_ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "sakura-postgres-test"})
+# Exact targets of the throwaway stack: loopback from the host, service name
+# from inside the test network. Port 5432 is deliberately absent on loopback,
+# so the application cluster can never be reached by mistake.
+APPROVED_TEST_TARGETS = frozenset(
+    {
+        ("127.0.0.1", 55432, "sakura_test"),
+        ("localhost", 55432, "sakura_test"),
+        ("sakura-postgres-test", 5432, "sakura_test"),
+    }
+)
+# The dedicated user of the test stack, not the application one.
+APPROVED_TEST_USERS = frozenset({"sakura_test"})
 # Cluster maintenance databases that must never be dropped.
 FORBIDDEN_DATABASE_NAMES = frozenset({"postgres", "template0", "template1"})
 # The database name must carry this token: a suffix-only check is not enough.
 TEST_DATABASE_TOKEN = "test"
 DEFAULT_POSTGRESQL_PORT = 5432
 
+# Created by ``sakura-postgres/test-init/01-test-marker.sql``, which only the
+# test stack mounts. Its presence proves the cluster was started for the tests.
+MARKER_TABLE = "sakura_test_marker"
+MARKER_VALUE = "sakura-destructive-test-database"
+
 
 class UnsafeTestDatabaseError(RuntimeError):
     """Raised when a URL is not provably a throwaway test database."""
 
 
-def _allowed_hosts() -> frozenset[str]:
-    """Return the default hosts plus the ones declared in the environment."""
-    declared = os.environ.get(ALLOWED_HOSTS_ENV, "")
-    extra = {host.strip().lower() for host in declared.split(",") if host.strip()}
-    return DEFAULT_ALLOWED_HOSTS | extra
+def _approved_targets() -> str:
+    """Render the approved targets for diagnostics."""
+    return ", ".join(
+        f"{host}:{port}/{database}" for host, port, database in sorted(APPROVED_TEST_TARGETS)
+    )
 
 
 def _describe(url: URL) -> str:
@@ -68,9 +86,9 @@ def assert_safe_test_database_url(url: Optional[str]) -> None:
 
     Raises:
         UnsafeTestDatabaseError: the URL is empty, is not PostgreSQL with the
-            asyncpg driver, points at an unknown host, targets a maintenance
-            database, does not carry the ``test`` token, or resolves to the
-            application database.
+            asyncpg driver, targets a maintenance database, does not carry the
+            ``test`` token, is not one of the approved test targets, uses a
+            different user, or resolves to the application database.
     """
     if not url:
         raise UnsafeTestDatabaseError(
@@ -93,13 +111,10 @@ def assert_safe_test_database_url(url: Optional[str]) -> None:
         )
 
     host = (parsed.host or "").lower()
-    if host not in _allowed_hosts():
-        raise UnsafeTestDatabaseError(
-            f"Test database host {host or '<empty>'} is not allowed; declare it in "
-            f"{ALLOWED_HOSTS_ENV} only for a dedicated test server: {_describe(parsed)}"
-        )
-
+    port = parsed.port or DEFAULT_POSTGRESQL_PORT
     database = (parsed.database or "").lower()
+    user = (parsed.username or "").lower()
+
     if not database:
         raise UnsafeTestDatabaseError(f"Test database name is missing: {_describe(parsed)}")
     if database in FORBIDDEN_DATABASE_NAMES:
@@ -110,6 +125,18 @@ def assert_safe_test_database_url(url: Optional[str]) -> None:
         raise UnsafeTestDatabaseError(
             f"Test database name {database} must contain '{TEST_DATABASE_TOKEN}': "
             f"{_describe(parsed)}"
+        )
+
+    if (host, port, database) not in APPROVED_TEST_TARGETS:
+        raise UnsafeTestDatabaseError(
+            "Test database target is not the throwaway cluster declared in "
+            f"docker-compose.test.yml (approved: {_approved_targets()}): "
+            f"{_describe(parsed)}"
+        )
+    if user not in APPROVED_TEST_USERS:
+        raise UnsafeTestDatabaseError(
+            f"Test database user {user or '<empty>'} is not the dedicated test user "
+            f"({', '.join(sorted(APPROVED_TEST_USERS))}): {_describe(parsed)}"
         )
 
     application = _application_database()
@@ -125,3 +152,34 @@ def assert_safe_test_database_url(url: Optional[str]) -> None:
                 "Test database resolves to the application database configured in "
                 f"{APPLICATION_DATABASE_URL_ENV}: {_describe(parsed)}"
             )
+
+
+async def assert_test_database_marker(connection) -> None:
+    """Fail unless the connected database carries the test-stack marker row.
+
+    ``connection`` is an ``AsyncConnection``. The check is a single ``SELECT``,
+    so it runs before ``drop_all`` and cannot modify anything. A cluster that
+    was not started from ``docker-compose.test.yml`` has no marker table, which
+    is exactly the case that must never be dropped.
+
+    Raises:
+        UnsafeTestDatabaseError: the marker table is missing or its row does not
+            carry the expected value.
+    """
+    try:
+        result = await connection.execute(
+            text(f"SELECT marker FROM {MARKER_TABLE} WHERE marker = :marker"),
+            {"marker": MARKER_VALUE},
+        )
+    except Exception as exc:
+        raise UnsafeTestDatabaseError(
+            f"Test database has no '{MARKER_TABLE}' table; start the throwaway "
+            "cluster with 'docker compose -f docker-compose.test.yml up -d --wait' "
+            f"before running the destructive tests ({type(exc).__name__})."
+        ) from None
+
+    if result.scalar_one_or_none() != MARKER_VALUE:
+        raise UnsafeTestDatabaseError(
+            f"Test database does not contain the '{MARKER_VALUE}' marker row; it is "
+            "not the throwaway cluster declared in docker-compose.test.yml."
+        )
