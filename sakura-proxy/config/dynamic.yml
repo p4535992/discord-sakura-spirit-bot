@@ -1,13 +1,14 @@
 # Dynamic Traefik configuration, reloaded by the file provider.
-# The bot has no public HTTP API: Traefik only exposes its health endpoint so
-# the container can be probed through the proxy.
+# The bot has no public HTTP API: only the liveness probe is published. The
+# readiness diagnostics (/ready) stay reachable only inside the Docker network,
+# for example through `docker compose exec sakura-bot`.
 http:
   routers:
     sakura-bot-health:
       entryPoints:
         - websecure
-      rule: "PathPrefix(`/`)"
-      priority: 1
+      rule: "Path(`/health`)"
+      priority: 10
       service: sakura-bot
       tls: {}
 

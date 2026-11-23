@@ -1,9 +1,14 @@
 """PostgreSQL integration test for user creation.
 
-Skipped unless ``SAKURA_POSTGRES_TEST_DATABASE_URL`` points at a throwaway
-database. The fixture drops and recreates the schema, so it must never target
-real data.
+The fixture drops and recreates the whole schema, so it only runs against a
+throwaway database declared through ``SAKURA_POSTGRES_TEST_DATABASE_URL`` and
+validated by ``assert_safe_test_database_url`` before any engine is created.
+
+Two outcomes are kept distinct: without the variable the test is skipped (a
+normal offline run), while a declared but unusable database fails the run
+instead of pretending success.
 """
+
 import os
 
 import pytest
@@ -13,6 +18,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from core.services import UserService
 from models.base import Base
 from models import User, UserStats
+from tests.support.database_guard import assert_safe_test_database_url
 
 pytestmark = pytest.mark.integration
 
@@ -24,6 +30,10 @@ async def postgres_session():
     if not TEST_DATABASE_URL:
         pytest.skip("SAKURA_POSTGRES_TEST_DATABASE_URL is not set")
 
+    # Runs before create_async_engine and before any DDL: a URL that is not a
+    # throwaway test database must fail here, never drop real tables.
+    assert_safe_test_database_url(TEST_DATABASE_URL)
+
     engine = create_async_engine(TEST_DATABASE_URL)
     try:
         async with engine.begin() as conn:
@@ -31,7 +41,7 @@ async def postgres_session():
             await conn.run_sync(Base.metadata.create_all)
     except Exception as exc:  # pragma: no cover - depends on the environment
         await engine.dispose()
-        pytest.skip(f"PostgreSQL is not reachable: {exc}")
+        pytest.fail(f"PostgreSQL test database is not usable: {exc}")
 
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as session:

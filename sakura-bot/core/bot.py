@@ -52,6 +52,9 @@ class SakuraSpiritBot(commands.Bot):
         # Initialize database and cache before any extension uses them.
         await init_database()
         await init_cache()
+        # The readiness probe needs the client instance to report the gateway
+        # state, so it is attached before the HTTP server starts.
+        health_server.attach(self)
         await health_server.start()
         
         for extension in self.required_extensions:
@@ -70,6 +73,8 @@ class SakuraSpiritBot(commands.Bot):
                 logger.exception("Optional extension failed to load: %s", extension)
         
         health_server.startup_failures = self.startup_failures
+        # Readiness may turn true only now: the extension loading is over.
+        health_server.bootstrap_complete = True
         
         if self.startup_failures and settings.strict_startup:
             raise RuntimeError(

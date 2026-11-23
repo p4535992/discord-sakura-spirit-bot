@@ -145,7 +145,10 @@ services:
     environment:
       TZ: Europe/Rome
     ports:
-      - "${SAKURA_PROXY_HTTPS_PORT}:443"
+      # Loopback only: the local profile must not publish the endpoint on the
+      # host network interfaces. Publish it on a specific address only after
+      # deciding to expose it, with a real certificate and access control.
+      - "127.0.0.1:${SAKURA_PROXY_HTTPS_PORT}:443"
     volumes:
       - sakura-proxy-logs:/var/log/traefik
       - ./sakura-proxy/config/traefik.yml:/etc/traefik/traefik.yml:ro

@@ -1,0 +1,46 @@
+# Throwaway stack for the destructive PostgreSQL integration tests.
+#
+# It is deliberately independent from docker-compose.yml: own project name, own
+# network, own credentials, no container name, no shared volume. The cluster
+# lives in tmpfs, so nothing survives `docker compose -f docker-compose.test.yml
+# down` and the application data volume `sakura-postgres-data` is never mounted.
+#
+#   docker compose -f docker-compose.test.yml up -d --wait
+#   export SAKURA_POSTGRES_TEST_DATABASE_URL=postgresql+asyncpg://sakura_test:sakura_test_pw@127.0.0.1:55432/sakura_test
+#   cd sakura-bot && pytest -m integration
+#   docker compose -f docker-compose.test.yml down
+name: sakura-spirit-bot-test
+
+services:
+  sakura-postgres-test:
+    image: "postgres:${SAKURA_POSTGRES_VERSION:-17-alpine}"
+    # No container_name: a second test stack must not collide with this one.
+    restart: "no"
+    mem_limit: ${SAKURA_TEST_POSTGRES_MEM_LIMIT:-256m}
+    cpus: 0.5
+    environment:
+      TZ: Europe/Rome
+      POSTGRES_DB: ${SAKURA_TEST_POSTGRES_DB:-sakura_test}
+      POSTGRES_USER: ${SAKURA_TEST_POSTGRES_USER:-sakura_test}
+      POSTGRES_PASSWORD: ${SAKURA_TEST_POSTGRES_PASSWORD:-sakura_test_pw}
+    ports:
+      # Loopback only: the test database must not be reachable from the network.
+      - "127.0.0.1:${SAKURA_TEST_POSTGRES_PORT:-55432}:5432"
+    # Ephemeral storage: the fixture drops the schema anyway, and tmpfs keeps the
+    # test data out of any Docker volume.
+    tmpfs:
+      - /var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - sakura-test
+
+networks:
+  sakura-test:
+    driver: bridge

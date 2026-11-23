@@ -15,4 +15,6 @@ PostgreSQL container (`sakura-postgres`), image
   `docker compose down -v` deletes it.
 - Published only on the host loopback (`127.0.0.1:${SAKURA_POSTGRES_PORT}`).
 - The integration test suite targets a separate throwaway database selected by
-  `SAKURA_POSTGRES_TEST_DATABASE_URL`; never point it at this database.
+  `SAKURA_POSTGRES_TEST_DATABASE_URL`; never point it at this database. The
+  dedicated cluster is defined in `../docker-compose.test.yml`
+  (`sakura-postgres-test`, tmpfs storage, own network and credentials).

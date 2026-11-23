@@ -113,7 +113,7 @@ docker compose ps
 | `sakura-bot` | built from `sakura-bot/Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
 | `sakura-postgres` | `postgres:${SAKURA_POSTGRES_VERSION}` | `127.0.0.1:${SAKURA_POSTGRES_PORT}` | Database, volume `sakura-postgres-data` |
 | `sakura-redis` | `redis:${SAKURA_REDIS_VERSION}` | none | LFG sessions and cooldowns |
-| `sakura-proxy` | `traefik:${SAKURA_PROXY_TRAEFIK_VERSION}` | `${SAKURA_PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
+| `sakura-proxy` | `traefik:${SAKURA_PROXY_TRAEFIK_VERSION}` | `127.0.0.1:${SAKURA_PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
 | `sakura-proxy-logrotate` | built from `sakura-proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
 
 Operational notes:
@@ -132,6 +132,12 @@ Operational notes:
   Replace it with a real certificate before exposing the endpoint.
 - The Traefik dashboard and ping endpoint are bound to the container loopback and
   are intentionally not published.
+- Traefik routes only `Path(`/health`)`, published on the host loopback. `/ready`
+  is not routed: read it inside the Docker network with
+  `docker compose exec sakura-bot ...` (see the day-to-day commands below).
+- The five `container_name` entries are fixed, so `docker compose -p <other>`
+  alone does not isolate a second copy of this stack: remove or parameterise
+  those names before running two stacks side by side.
 
 Day-to-day commands:
 
@@ -141,6 +147,24 @@ docker compose exec sakura-bot python -c "import urllib.request; print(urllib.re
 curl -k https://localhost/health
 docker compose down          # keeps the named volumes
 ```
+
+### Test Database Stack
+
+The destructive PostgreSQL integration test needs its own cluster.
+`docker-compose.test.yml` provides it: separate project name, separate network,
+tmpfs storage, no container name and no access to `sakura-postgres-data`.
+
+```bash
+docker compose -f docker-compose.test.yml up -d --wait
+export SAKURA_POSTGRES_TEST_DATABASE_URL=postgresql+asyncpg://sakura_test:sakura_test_pw@127.0.0.1:55432/sakura_test
+cd sakura-bot && pytest -m integration
+docker compose -f docker-compose.test.yml down
+```
+
+`tests/support/database_guard.py` validates the URL before any DDL and rejects
+anything that is not a throwaway test database. Never run the integration suite
+against `sakura-postgres`, and never use `docker compose down -v` on the
+application project as a cleanup step.
 
 ### Option 2: Systemd Service
 

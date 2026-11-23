@@ -1,6 +1,7 @@
 """
 Database connection and session management
 """
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -70,13 +71,18 @@ class Database:
             logger.exception("Failed to create database tables")
             raise
 
-    async def ping(self) -> bool:
-        """Return True when a trivial query succeeds; used by readiness probes."""
+    async def ping(self, timeout: float = 5.0) -> bool:
+        """Return True when a trivial query succeeds within ``timeout`` seconds.
+
+        The timeout keeps a hung database from blocking the readiness probe for
+        the whole TCP timeout.
+        """
         if not self.engine:
             return False
         try:
-            async with self.engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
+            async with asyncio.timeout(timeout):
+                async with self.engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
             return True
         except Exception:
             logger.warning("Database readiness check failed", exc_info=True)

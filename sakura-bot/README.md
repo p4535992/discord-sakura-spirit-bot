@@ -24,6 +24,14 @@ docker build -t sakura-spirit-bot:local .    # build context is this folder
 pytest                                       # no external service needed
 ```
 
+The PostgreSQL integration test drops and recreates the whole schema. It runs
+only against a throwaway database declared through
+`SAKURA_POSTGRES_TEST_DATABASE_URL`, validated by
+`tests/support/database_guard.py` before any DDL (PostgreSQL + asyncpg, allowed
+host, name carrying the `test` token, not the application database). Without the
+variable the test is skipped; with the variable set an unreachable server fails
+the run. The dedicated cluster comes from `../docker-compose.test.yml`.
+
 - Configuration: environment variables only, all prefixed `SAKURA_BOT_`
   (see `../.env.example`). For a host run the settings object also reads
   `../.env`, so the root file works without copying it into this folder.

@@ -78,8 +78,12 @@ curl -k https://localhost/health
 docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
 ```
 
-`/health` reports process liveness; `/ready` returns HTTP 503 with the failing
-checks until PostgreSQL, Redis and the command extensions are available.
+`/health` reports process liveness and is the only path Traefik publishes, on
+`127.0.0.1` only. `/ready` reports whether the bot can serve traffic (Discord
+gateway connected, bootstrap complete, PostgreSQL reachable, Redis answering
+`PING` when `SAKURA_BOT_CACHE_REQUIRED=true`, required extensions loaded): it
+returns HTTP 503 with the failing checks and stays reachable only inside the
+Docker network, so it is read with `docker compose exec` as shown above.
 
 ### 4. Run Without Docker (optional)
 
@@ -100,11 +104,27 @@ object also reads `../.env`, so the same file serves Compose and a host run.
 ```bash
 cd sakura-bot
 pytest                    # smoke and unit tests, no external service needed
-pytest -m integration     # requires SAKURA_POSTGRES_TEST_DATABASE_URL
 ```
 
-The integration fixture drops and recreates the schema, so
-`SAKURA_POSTGRES_TEST_DATABASE_URL` must reference a throwaway database.
+The PostgreSQL integration test drops and recreates the whole schema, so it runs
+only against a throwaway database declared through
+`SAKURA_POSTGRES_TEST_DATABASE_URL` and validated by
+`tests/support/database_guard.py` before any DDL. The guard rejects a
+non-PostgreSQL URL, an unknown host, a cluster maintenance database, a name
+without the `test` token and any URL that resolves to the application database.
+Without the variable the test is skipped; with the variable set an unreachable
+server fails the run instead of reporting success.
+
+The dedicated test database has its own compose file: own project name, own
+network, tmpfs storage, no container name and nothing shared with the
+application stack, so the `sakura-postgres-data` volume is never touched.
+
+```bash
+docker compose -f docker-compose.test.yml up -d --wait
+export SAKURA_POSTGRES_TEST_DATABASE_URL=postgresql+asyncpg://sakura_test:sakura_test_pw@127.0.0.1:55432/sakura_test
+cd sakura-bot && pytest -m integration
+docker compose -f docker-compose.test.yml down
+```
 
 ## 🤖 Usage
 
@@ -157,6 +177,7 @@ This bot is built with a modular architecture, making it easy to extend and add 
 ├── sakura-proxy-logrotate/  # Log rotation sidecar: Dockerfile, config, scripts
 ├── .env.example             # Environment variable template
 ├── docker-compose.yml       # Bot, PostgreSQL, Redis, Traefik, logrotate
+├── docker-compose.test.yml  # Throwaway PostgreSQL for the integration tests
 └── README.md                # This file
 ```
 
@@ -164,7 +185,7 @@ Each container has its own folder named after it (`sakura-bot/`,
 `sakura-redis/`, ...) holding its `config/`, `scripts/`, `Dockerfile` and a
 short `README.md`. Folder name, compose service name, `container_name` and
 environment prefix always match, so `sakura-proxy` is the `sakura-proxy/`
-folder, the `sakura-proxy` service and the `PROXY_*` variables. `sakura-bot/`
+folder, the `sakura-proxy` service and the `SAKURA_PROXY_*` variables. `sakura-bot/`
 also holds the whole application (sources, tests, requirements and lint
 configuration), so it is the build context of the bot image; the repository root
 keeps only the project-level files (Compose, `.env.example`, documentation).

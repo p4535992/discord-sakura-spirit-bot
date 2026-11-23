@@ -1,19 +1,25 @@
 """Shared test configuration.
 
 ``core.config`` instantiates ``Settings`` at import time, so the environment
-must be prepared before any project module is imported.
-``SAKURA_BOT_DATABASE_URL`` is always overridden: tests must never reach a real
-database by accident.
+must be prepared before any project module is imported. Every value below is
+assigned, never defaulted, so a real value exported in the developer shell
+cannot reach the tests.
 """
+
 import os
 
 # Dedicated test database; set SAKURA_POSTGRES_TEST_DATABASE_URL to point at a
-# throwaway PostgreSQL instance (for example the compose ``sakura-postgres``
-# service).
+# throwaway PostgreSQL instance (see ../docker-compose.test.yml).
 TEST_DATABASE_URL = os.environ.get(
     "SAKURA_POSTGRES_TEST_DATABASE_URL",
     "postgresql+asyncpg://sakura:sakura@localhost:5432/sakura_test",
 )
+
+# The application URL is replaced by an unreachable placeholder: a test that
+# accidentally used the application engine fails immediately instead of writing
+# to whatever database the developer configured, and the destructive-test guard
+# can still tell the test database apart from the application one.
+APPLICATION_DATABASE_PLACEHOLDER = "postgresql+asyncpg://sakura:sakura@127.0.0.1:1/sakura_bot"
 
 # Variables are set in their container-prefixed form, exactly as compose does.
 # The legacy names are removed first so a value exported in the developer shell
@@ -36,17 +42,17 @@ _CANONICAL_NAMES = (
 for _name in _CANONICAL_NAMES:
     os.environ.pop(_name, None)
 
-os.environ["SAKURA_BOT_DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["SAKURA_BOT_DATABASE_URL"] = APPLICATION_DATABASE_PLACEHOLDER
 os.environ["SAKURA_BOT_ENVIRONMENT"] = "test"
 os.environ["SAKURA_BOT_LOG_LEVEL"] = "WARNING"
 os.environ["SAKURA_BOT_LOG_FILE"] = "logs/test.log"
 os.environ["SAKURA_BOT_CACHE_REQUIRED"] = "false"
 os.environ["SAKURA_BOT_HEALTH_SERVER_ENABLED"] = "false"
 os.environ["SAKURA_BOT_STRICT_STARTUP"] = "false"
-os.environ.setdefault("SAKURA_BOT_DISCORD_TOKEN", "test-token")
-os.environ.setdefault("SAKURA_BOT_DISCORD_CLIENT_ID", "123456789012345678")
-os.environ.setdefault("SAKURA_BOT_REDIS_URL", "redis://localhost:6379/15")
-os.environ.setdefault("SAKURA_BOT_OPENAI_API_KEY", "test-openai-key")
+os.environ["SAKURA_BOT_DISCORD_TOKEN"] = "test-token"
+os.environ["SAKURA_BOT_DISCORD_CLIENT_ID"] = "123456789012345678"
+os.environ["SAKURA_BOT_REDIS_URL"] = "redis://localhost:6379/15"
+os.environ["SAKURA_BOT_OPENAI_API_KEY"] = "test-openai-key"
 
 import pytest  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402

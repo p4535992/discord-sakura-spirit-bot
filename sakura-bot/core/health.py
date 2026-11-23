@@ -1,13 +1,15 @@
 """
-Minimal HTTP health endpoint used by container orchestration.
+HTTP probes used by container orchestration.
 
 ``/health`` reports process liveness, ``/ready`` reports whether the bot can
-serve traffic (database reachable, required extensions loaded, cache available
-when ``SAKURA_BOT_CACHE_REQUIRED`` is true). No configuration value or user data is
-exposed.
+serve traffic: the Discord gateway must be connected, the bootstrap must be
+complete, the database must answer a trivial query, Redis must answer a ``PING``
+when ``SAKURA_BOT_CACHE_REQUIRED`` is true and every required extension must be
+loaded. No configuration value, credential or user data is exposed.
 """
+
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from aiohttp import web
 
@@ -17,6 +19,10 @@ from core.database import db
 
 logger = logging.getLogger(__name__)
 
+READY_STATUS = "ready"
+DEGRADED_STATUS = "degraded"
+NOT_READY_STATUS = "not_ready"
+
 
 class HealthServer:
     """Small aiohttp server exposing liveness and readiness probes."""
@@ -24,6 +30,23 @@ class HealthServer:
     def __init__(self):
         self._runner: Optional[web.AppRunner] = None
         self.startup_failures: list[str] = []
+        # Readiness stays false until setup_hook has loaded every required
+        # extension: an empty ``startup_failures`` alone does not prove that the
+        # bootstrap already finished.
+        self.bootstrap_complete = False
+        self.shutting_down = False
+        self._bot: Optional[Any] = None
+
+    def attach(self, bot: Any) -> None:
+        """Bind the Discord client; typed as ``Any`` to avoid an import cycle."""
+        self._bot = bot
+
+    def create_app(self) -> web.Application:
+        """Build the aiohttp application; tests use it without a real socket."""
+        app = web.Application()
+        app.router.add_get("/health", self.handle_health)
+        app.router.add_get("/ready", self.handle_ready)
+        return app
 
     async def start(self):
         """Start the server when enabled by configuration."""
@@ -31,11 +54,7 @@ class HealthServer:
             logger.info("Health endpoint disabled by configuration")
             return
 
-        app = web.Application()
-        app.router.add_get("/health", self._handle_health)
-        app.router.add_get("/ready", self._handle_ready)
-
-        self._runner = web.AppRunner(app, access_log=None)
+        self._runner = web.AppRunner(self.create_app(), access_log=None)
         await self._runner.setup()
         site = web.TCPSite(self._runner, settings.health_host, settings.health_port)
         await site.start()
@@ -46,26 +65,49 @@ class HealthServer:
         )
 
     async def stop(self):
-        """Stop the server and release the listening socket."""
+        """Stop the server and fail readiness before the clients are closed."""
+        self.shutting_down = True
         if self._runner:
             await self._runner.cleanup()
             self._runner = None
             logger.info("Health endpoint stopped")
 
-    async def _handle_health(self, request: web.Request) -> web.Response:
+    async def handle_health(self, request: web.Request) -> web.Response:
+        """Liveness only: the process answers, whatever the gateway state is."""
         return web.json_response({"status": "ok"})
 
-    async def _handle_ready(self, request: web.Request) -> web.Response:
-        database_ready = await db.ping()
-        cache_ready = cache.redis is not None
-        extensions_ready = not self.startup_failures
-        ready = database_ready and extensions_ready and (
-            cache_ready or not settings.cache_required
-        )
+    async def handle_ready(self, request: web.Request) -> web.Response:
+        """Readiness: HTTP 200 only when the bot can actually serve traffic."""
+        payload = await self.collect_readiness()
+        status = 200 if payload["status"] in (READY_STATUS, DEGRADED_STATUS) else 503
+        return web.json_response(payload, status=status)
 
-        payload = {
-            "status": "ready" if ready else "not_ready",
+    async def collect_readiness(self) -> dict[str, Any]:
+        """Return the readiness payload; both probes are time bounded."""
+        discord_ready = self._bot is not None and self._bot.is_ready()
+        database_ready = await db.ping()
+        cache_ready = await cache.ping()
+        extensions_ready = not self.startup_failures
+        cache_acceptable = cache_ready or not settings.cache_required
+
+        ready = (
+            discord_ready
+            and database_ready
+            and extensions_ready
+            and cache_acceptable
+            and self.bootstrap_complete
+            and not self.shutting_down
+        )
+        if ready:
+            status = READY_STATUS if cache_ready else DEGRADED_STATUS
+        else:
+            status = NOT_READY_STATUS
+
+        payload: dict[str, Any] = {
+            "status": status,
             "checks": {
+                "discord": discord_ready,
+                "bootstrap": self.bootstrap_complete,
                 "database": database_ready,
                 "cache": cache_ready,
                 "extensions": extensions_ready,
@@ -73,8 +115,7 @@ class HealthServer:
         }
         if self.startup_failures:
             payload["failed_extensions"] = list(self.startup_failures)
-
-        return web.json_response(payload, status=200 if ready else 503)
+        return payload
 
 
 health_server = HealthServer()

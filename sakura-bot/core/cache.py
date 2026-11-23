@@ -6,6 +6,7 @@ The cache is optional at runtime. When Redis is unreachable and
 operation becomes a no-op, the degradation is logged once and the readiness
 endpoint reports it. Nothing is hidden and nothing crashes silently.
 """
+import asyncio
 import json
 import logging
 from typing import Any, Optional
@@ -55,6 +56,21 @@ class Cache:
             await self.redis.aclose()
             self.redis = None
             logger.info("Redis connection closed")
+
+    async def ping(self, timeout: float = 5.0) -> bool:
+        """Return True when Redis answers a PING within ``timeout`` seconds.
+
+        A client object alone proves nothing: the connection may already be
+        gone, so readiness needs a real round trip.
+        """
+        if not self.redis:
+            return False
+        try:
+            await asyncio.wait_for(self.redis.ping(), timeout)
+            return True
+        except Exception:
+            logger.warning("Redis readiness check failed", exc_info=True)
+            return False
     
     async def get(self, key: str) -> Optional[str]:
         """Get value from cache."""

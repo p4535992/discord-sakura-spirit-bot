@@ -1,9 +1,9 @@
 # Multi-stage build: compilers stay in the builder, the runtime image only
 # carries the virtual environment and the application sources.
 #
-# Build from the repository root, because the context must contain the
-# application sources:
-#   docker build -f sakura-bot/Dockerfile -t sakura-spirit-bot:local .
+# The build context is this folder, which holds the application sources:
+#   docker build -t sakura-spirit-bot:local .
+# Docker Compose declares the same context (`context: ./sakura-bot`).
 FROM python:3.13-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
