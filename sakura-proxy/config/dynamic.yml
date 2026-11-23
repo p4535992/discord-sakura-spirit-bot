@@ -3,17 +3,17 @@
 # the container can be probed through the proxy.
 http:
   routers:
-    bot-health:
+    sakura-bot-health:
       entryPoints:
         - websecure
       rule: "PathPrefix(`/`)"
       priority: 1
-      service: bot
+      service: sakura-bot
       tls: {}
 
   services:
-    bot:
+    sakura-bot:
       loadBalancer:
         passHostHeader: true
         servers:
-          - url: "http://bot:8080"
+          - url: "http://sakura-bot:8080"

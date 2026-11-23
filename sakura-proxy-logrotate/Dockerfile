@@ -2,7 +2,7 @@
 FROM alpine:3.24.4
 
 RUN apk add --no-cache logrotate tzdata \
-    && mkdir -p /var/log/traefik /var/log/sakura-bot /var/log/proxy-logrotate /var/lib/logrotate
+    && mkdir -p /var/log/traefik /var/log/sakura-bot /var/log/sakura-proxy-logrotate /var/lib/logrotate
 
 COPY config/crontab /etc/crontabs/root
 COPY config/logrotate.conf /etc/logrotate.d/sakura-bot

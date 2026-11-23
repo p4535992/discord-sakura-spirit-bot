@@ -110,20 +110,20 @@ docker compose ps
 
 | Service | Image | Published port | Purpose |
 |---|---|---|---|
-| `bot` | built from `bot/Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
-| `postgres` | `postgres:${POSTGRES_VERSION}` | `127.0.0.1:${POSTGRES_PORT}` | Database, bind mount `data/postgres` |
-| `redis` | `redis:${REDIS_VERSION}` | none | LFG sessions and cooldowns |
-| `proxy` | `traefik:${PROXY_TRAEFIK_VERSION}` | `${PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
-| `proxy-logrotate` | built from `proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
+| `sakura-bot` | built from `sakura-bot/Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
+| `sakura-postgres` | `postgres:${POSTGRES_VERSION}` | `127.0.0.1:${POSTGRES_PORT}` | Database, bind mount `data/sakura-postgres` |
+| `sakura-redis` | `redis:${REDIS_VERSION}` | none | LFG sessions and cooldowns |
+| `sakura-proxy` | `traefik:${PROXY_TRAEFIK_VERSION}` | `${PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
+| `sakura-proxy-logrotate` | built from `sakura-proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
 
 Operational notes:
 
 - `SAKURA_BOT_CACHE_REQUIRED=true` is set in `docker-compose.yml`: the bot refuses to
-  start without Redis. Remove the `redis` service only after switching the
+  start without Redis. Remove the `sakura-redis` service only after switching the
   variable to `false`, which enables the degraded cache mode reported by
   `/ready`.
 - The bot image runs as UID 10001. On a Linux host create the log directory first
-  (`mkdir -p logs/bot && sudo chown 10001:10001 logs/bot`), otherwise Docker creates
+  (`mkdir -p logs/sakura-bot && sudo chown 10001:10001 logs/sakura-bot`), otherwise Docker creates
   it as root and the bot cannot write.
 - Traefik has no default certificate configured, so it generates a self-signed one.
   Replace it with a real certificate before exposing the endpoint.
@@ -133,8 +133,8 @@ Operational notes:
 Day-to-day commands:
 
 ```bash
-docker compose logs -f bot
-docker compose exec bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
+docker compose logs -f sakura-bot
+docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
 curl -k https://localhost/health
 docker compose down          # keeps data/ and logs/
 ```

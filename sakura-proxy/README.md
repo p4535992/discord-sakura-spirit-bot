@@ -1,4 +1,4 @@
-# proxy
+# sakura-proxy
 
 Traefik container (`sakura-proxy`), image `traefik:${PROXY_TRAEFIK_VERSION}`.
 
@@ -10,5 +10,5 @@ Traefik container (`sakura-proxy`), image `traefik:${PROXY_TRAEFIK_VERSION}`.
   endpoint stay on the container loopback and are intentionally not published.
 - No certificate is configured, so Traefik generates a self-signed one; replace
   it before exposing the endpoint outside the host.
-- Access logs go to `../logs/proxy` and are rotated by the `proxy-logrotate`
+- Access logs go to `../logs/sakura-proxy` and are rotated by the `sakura-proxy-logrotate`
   sidecar.

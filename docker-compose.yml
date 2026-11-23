@@ -4,7 +4,7 @@
 name: sakura-spirit-bot
 
 services:
-  postgres:
+  sakura-postgres:
     image: "postgres:${POSTGRES_VERSION}"
     container_name: sakura-postgres
     restart: always
@@ -21,7 +21,7 @@ services:
       # Reachable only from the host loopback, never from the network.
       - "127.0.0.1:${POSTGRES_PORT}:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/sakura-postgres:/var/lib/postgresql/data
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -38,7 +38,7 @@ services:
     networks:
       - sakura-platform
 
-  redis:
+  sakura-redis:
     # Required by core/cache.py for LFG sessions and cooldowns. Removing this
     # service requires SAKURA_BOT_CACHE_REQUIRED=false on the bot (degraded mode).
     image: "redis:${REDIS_VERSION}"
@@ -48,11 +48,11 @@ services:
     cpus: 0.25
     environment:
       TZ: Europe/Rome
-    # Configuration lives in redis/config/redis.conf: no persistence, protected
+    # Configuration lives in sakura-redis/config/redis.conf: no persistence, protected
     # mode disabled because the port is not published on the host.
     command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     volumes:
-      - ./redis/config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./sakura-redis/config/redis.conf:/usr/local/etc/redis/redis.conf:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -69,11 +69,11 @@ services:
     networks:
       - sakura-platform
 
-  bot:
+  sakura-bot:
     image: sakura-spirit-bot:local
     build:
       context: .
-      dockerfile: bot/Dockerfile
+      dockerfile: sakura-bot/Dockerfile
     container_name: sakura-bot
     restart: always
     mem_limit: ${SAKURA_BOT_MEM_LIMIT}
@@ -85,8 +85,8 @@ services:
       SAKURA_BOT_PREFIX: ${SAKURA_BOT_PREFIX}
       SAKURA_BOT_OWNER_ID: ${SAKURA_BOT_OWNER_ID}
       # Built from the PostgreSQL service variables above.
-      SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      SAKURA_BOT_REDIS_URL: redis://redis:6379/0
+      SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@sakura-postgres:5432/${POSTGRES_DB}
+      SAKURA_BOT_REDIS_URL: redis://sakura-redis:6379/0
       SAKURA_BOT_CACHE_REQUIRED: "true"
       SAKURA_BOT_OPENAI_API_KEY: ${SAKURA_BOT_OPENAI_API_KEY}
       SAKURA_BOT_ENVIRONMENT: ${SAKURA_BOT_ENVIRONMENT}
@@ -104,13 +104,13 @@ services:
       SAKURA_BOT_ENABLE_GACHA: ${SAKURA_BOT_ENABLE_GACHA}
       SAKURA_BOT_ENABLE_EVENTS: ${SAKURA_BOT_ENABLE_EVENTS}
     volumes:
-      - ./logs/bot:/var/log/sakura-bot
+      - ./logs/sakura-bot:/var/log/sakura-bot
     security_opt:
       - no-new-privileges:true
     depends_on:
-      postgres:
+      sakura-postgres:
         condition: service_healthy
-      redis:
+      sakura-redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -130,7 +130,7 @@ services:
     networks:
       - sakura-platform
 
-  proxy:
+  sakura-proxy:
     image: "traefik:${PROXY_TRAEFIK_VERSION}"
     container_name: sakura-proxy
     restart: always
@@ -141,9 +141,9 @@ services:
     ports:
       - "${PROXY_HTTPS_PORT}:443"
     volumes:
-      - ./logs/proxy:/var/log/traefik
-      - ./proxy/config/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./proxy/config/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./logs/sakura-proxy:/var/log/traefik
+      - ./sakura-proxy/config/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./sakura-proxy/config/dynamic.yml:/etc/traefik/dynamic.yml:ro
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -153,7 +153,7 @@ services:
       retries: 5
       start_period: 30s
     depends_on:
-      bot:
+      sakura-bot:
         condition: service_started
     logging:
       driver: json-file
@@ -163,10 +163,10 @@ services:
     networks:
       - sakura-platform
 
-  proxy-logrotate:
+  sakura-proxy-logrotate:
     image: sakura-spirit-bot/logrotate:local
     build:
-      context: ./proxy-logrotate
+      context: ./sakura-proxy-logrotate
     container_name: sakura-proxy-logrotate
     restart: always
     mem_limit: ${PROXY_LOGROTATE_MEM_LIMIT}
@@ -174,10 +174,10 @@ services:
     environment:
       TZ: Europe/Rome
     volumes:
-      - ./data/proxy-logrotate/state:/var/lib/logrotate
-      - ./logs/proxy:/var/log/traefik
-      - ./logs/bot:/var/log/sakura-bot
-      - ./logs/proxy-logrotate:/var/log/proxy-logrotate
+      - ./data/sakura-proxy-logrotate/state:/var/lib/logrotate
+      - ./logs/sakura-proxy:/var/log/traefik
+      - ./logs/sakura-bot:/var/log/sakura-bot
+      - ./logs/sakura-proxy-logrotate:/var/log/sakura-proxy-logrotate
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -187,7 +187,7 @@ services:
       retries: 3
       start_period: 30s
     depends_on:
-      proxy:
+      sakura-proxy:
         condition: service_started
     logging:
       driver: json-file

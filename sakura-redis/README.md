@@ -1,4 +1,4 @@
-# redis
+# sakura-redis
 
 Redis container (`sakura-redis`), image `redis:${REDIS_VERSION}`.
 

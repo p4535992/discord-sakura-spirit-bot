@@ -3,7 +3,7 @@
 #
 # Build from the repository root, because the context must contain the
 # application sources:
-#   docker build -f bot/Dockerfile -t sakura-spirit-bot:local .
+#   docker build -f sakura-bot/Dockerfile -t sakura-spirit-bot:local .
 FROM python:3.13-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \

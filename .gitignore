@@ -333,9 +333,9 @@ AGENTS.md
 /backups/
 
 # Prevenire l'aggiunta accidentale di vecchi certificati e chiavi.
-/proxy/config/cert/*.key
-/proxy/config/cert/*.crt
-/proxy/config/cert/*.cer
+/sakura-proxy/config/cert/*.key
+/sakura-proxy/config/cert/*.crt
+/sakura-proxy/config/cert/*.cer
 
 # Non versionare credenziali JAAS e altri file segreti per servizio.
 **/secrets/**
@@ -358,7 +358,7 @@ AGENTS.md
 **/backups/**
 **/secrets/**
 **/*_jaas.conf
-**/proxy/config/cert/*.cer
-**/proxy/config/cert/*.crt
-**/proxy/config/cert/*.key
+**/sakura-proxy/config/cert/*.cer
+**/sakura-proxy/config/cert/*.crt
+**/sakura-proxy/config/cert/*.key
 **/.compose-generation.*

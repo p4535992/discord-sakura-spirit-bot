@@ -1,4 +1,4 @@
-# proxy-logrotate
+# sakura-proxy-logrotate
 
 Log rotation sidecar (`sakura-proxy-logrotate`), built from `Dockerfile` on
 `alpine:3.24.4`.
@@ -9,5 +9,5 @@ Log rotation sidecar (`sakura-proxy-logrotate`), built from `Dockerfile` on
 - `scripts/start.sh`: entrypoint (cron in the foreground).
 - `scripts/rotate_once.sh`: manual rotation, useful for verification.
 - `scripts/healthcheck.sh`: container healthcheck.
-- State: `../data/proxy-logrotate/state`; own logs:
-  `../logs/proxy-logrotate`.
+- State: `../data/sakura-proxy-logrotate/state`; own logs:
+  `../logs/sakura-proxy-logrotate`.
