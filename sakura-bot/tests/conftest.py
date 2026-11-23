@@ -7,10 +7,11 @@ database by accident.
 """
 import os
 
-# Dedicated test database; set POSTGRES_TEST_DATABASE_URL to point at a
-# throwaway PostgreSQL instance (for example the compose ``postgres`` service).
+# Dedicated test database; set SAKURA_POSTGRES_TEST_DATABASE_URL to point at a
+# throwaway PostgreSQL instance (for example the compose ``sakura-postgres``
+# service).
 TEST_DATABASE_URL = os.environ.get(
-    "POSTGRES_TEST_DATABASE_URL",
+    "SAKURA_POSTGRES_TEST_DATABASE_URL",
     "postgresql+asyncpg://sakura:sakura@localhost:5432/sakura_test",
 )
 

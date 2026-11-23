@@ -1,7 +1,8 @@
 """PostgreSQL integration test for user creation.
 
-Skipped unless ``POSTGRES_TEST_DATABASE_URL`` points at a throwaway database.
-The fixture drops and recreates the schema, so it must never target real data.
+Skipped unless ``SAKURA_POSTGRES_TEST_DATABASE_URL`` points at a throwaway
+database. The fixture drops and recreates the schema, so it must never target
+real data.
 """
 import os
 
@@ -15,13 +16,13 @@ from models import User, UserStats
 
 pytestmark = pytest.mark.integration
 
-TEST_DATABASE_URL = os.environ.get("POSTGRES_TEST_DATABASE_URL")
+TEST_DATABASE_URL = os.environ.get("SAKURA_POSTGRES_TEST_DATABASE_URL")
 
 
 @pytest.fixture
 async def postgres_session():
     if not TEST_DATABASE_URL:
-        pytest.skip("POSTGRES_TEST_DATABASE_URL is not set")
+        pytest.skip("SAKURA_POSTGRES_TEST_DATABASE_URL is not set")
 
     engine = create_async_engine(TEST_DATABASE_URL)
     try:

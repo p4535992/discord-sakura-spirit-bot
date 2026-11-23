@@ -338,7 +338,9 @@ SAKURA_BOT_ENVIRONMENT (development/production)
 ```
 
 Variables are prefixed with the container that reads them (`SAKURA_BOT_*`,
-`POSTGRES_*`, `REDIS_*`, `PROXY_*`, `PROXY_LOGROTATE_*`).
+`SAKURA_POSTGRES_*`, `SAKURA_REDIS_*`, `SAKURA_PROXY_*`,
+`SAKURA_PROXY_LOGROTATE_*`); Compose maps the PostgreSQL keys to the
+`POSTGRES_*` names the official image requires.
 
 ## Development Phases
 

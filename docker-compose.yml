@@ -5,21 +5,23 @@ name: sakura-spirit-bot
 
 services:
   sakura-postgres:
-    image: "postgres:${POSTGRES_VERSION}"
+    image: "postgres:${SAKURA_POSTGRES_VERSION}"
     container_name: sakura-postgres
     restart: always
-    mem_limit: ${POSTGRES_MEM_LIMIT}
+    mem_limit: ${SAKURA_POSTGRES_MEM_LIMIT}
     cpus: 1.0
     environment:
       TZ: Europe/Rome
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # The official image only reads POSTGRES_*: .env keeps the container
+      # prefix (SAKURA_POSTGRES_*) and Compose maps it here.
+      POSTGRES_DB: ${SAKURA_POSTGRES_DB}
+      POSTGRES_USER: ${SAKURA_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SAKURA_POSTGRES_PASSWORD}
       # Keep the cluster in a subdirectory so the volume root stays clean.
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       # Reachable only from the host loopback, never from the network.
-      - "127.0.0.1:${POSTGRES_PORT}:5432"
+      - "127.0.0.1:${SAKURA_POSTGRES_PORT}:5432"
     volumes:
       # Named volume: the cluster survives image rebuilds and `down`.
       - sakura-postgres-data:/var/lib/postgresql/data
@@ -42,10 +44,10 @@ services:
   sakura-redis:
     # Required by core/cache.py for LFG sessions and cooldowns. Removing this
     # service requires SAKURA_BOT_CACHE_REQUIRED=false on the bot (degraded mode).
-    image: "redis:${REDIS_VERSION}"
+    image: "redis:${SAKURA_REDIS_VERSION}"
     container_name: sakura-redis
     restart: always
-    mem_limit: ${REDIS_MEM_LIMIT}
+    mem_limit: ${SAKURA_REDIS_MEM_LIMIT}
     cpus: 0.25
     environment:
       TZ: Europe/Rome
@@ -88,7 +90,7 @@ services:
       SAKURA_BOT_PREFIX: ${SAKURA_BOT_PREFIX}
       SAKURA_BOT_OWNER_ID: ${SAKURA_BOT_OWNER_ID}
       # Built from the PostgreSQL service variables above.
-      SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@sakura-postgres:5432/${POSTGRES_DB}
+      SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://${SAKURA_POSTGRES_USER}:${SAKURA_POSTGRES_PASSWORD}@sakura-postgres:5432/${SAKURA_POSTGRES_DB}
       SAKURA_BOT_REDIS_URL: redis://sakura-redis:6379/0
       SAKURA_BOT_CACHE_REQUIRED: "true"
       SAKURA_BOT_OPENAI_API_KEY: ${SAKURA_BOT_OPENAI_API_KEY}
@@ -135,15 +137,15 @@ services:
       - sakura-platform
 
   sakura-proxy:
-    image: "traefik:${PROXY_TRAEFIK_VERSION}"
+    image: "traefik:${SAKURA_PROXY_TRAEFIK_VERSION}"
     container_name: sakura-proxy
     restart: always
-    mem_limit: ${PROXY_MEM_LIMIT}
+    mem_limit: ${SAKURA_PROXY_MEM_LIMIT}
     cpus: 0.5
     environment:
       TZ: Europe/Rome
     ports:
-      - "${PROXY_HTTPS_PORT}:443"
+      - "${SAKURA_PROXY_HTTPS_PORT}:443"
     volumes:
       - sakura-proxy-logs:/var/log/traefik
       - ./sakura-proxy/config/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -173,7 +175,7 @@ services:
       context: ./sakura-proxy-logrotate
     container_name: sakura-proxy-logrotate
     restart: always
-    mem_limit: ${PROXY_LOGROTATE_MEM_LIMIT}
+    mem_limit: ${SAKURA_PROXY_LOGROTATE_MEM_LIMIT}
     cpus: 0.25
     environment:
       TZ: Europe/Rome

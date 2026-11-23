@@ -111,9 +111,9 @@ docker compose ps
 | Service | Image | Published port | Purpose |
 |---|---|---|---|
 | `sakura-bot` | built from `sakura-bot/Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
-| `sakura-postgres` | `postgres:${POSTGRES_VERSION}` | `127.0.0.1:${POSTGRES_PORT}` | Database, volume `sakura-postgres-data` |
-| `sakura-redis` | `redis:${REDIS_VERSION}` | none | LFG sessions and cooldowns |
-| `sakura-proxy` | `traefik:${PROXY_TRAEFIK_VERSION}` | `${PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
+| `sakura-postgres` | `postgres:${SAKURA_POSTGRES_VERSION}` | `127.0.0.1:${SAKURA_POSTGRES_PORT}` | Database, volume `sakura-postgres-data` |
+| `sakura-redis` | `redis:${SAKURA_REDIS_VERSION}` | none | LFG sessions and cooldowns |
+| `sakura-proxy` | `traefik:${SAKURA_PROXY_TRAEFIK_VERSION}` | `${SAKURA_PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
 | `sakura-proxy-logrotate` | built from `sakura-proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
 
 Operational notes:
@@ -228,13 +228,13 @@ Regular backups are essential. With Compose the database lives in the
 `sakura-postgres-data` volume, so dump it through the running container:
 
 ```bash
-set -a; . ./.env; set +a          # POSTGRES_USER / POSTGRES_DB
+set -a; . ./.env; set +a          # SAKURA_POSTGRES_USER / SAKURA_POSTGRES_DB
 
 # Backup PostgreSQL
-docker compose exec -T sakura-postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup_$(date +%Y%m%d).sql
+docker compose exec -T sakura-postgres pg_dump -U "$SAKURA_POSTGRES_USER" "$SAKURA_POSTGRES_DB" > backup_$(date +%Y%m%d).sql
 
 # Restore from backup
-docker compose exec -T sakura-postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB" < backup_20240101.sql
+docker compose exec -T sakura-postgres psql -U "$SAKURA_POSTGRES_USER" "$SAKURA_POSTGRES_DB" < backup_20240101.sql
 ```
 
 Keep the dumps outside the repository, on the disk that holds the backups.

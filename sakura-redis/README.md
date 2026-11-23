@@ -1,6 +1,6 @@
 # sakura-redis
 
-Redis container (`sakura-redis`), image `redis:${REDIS_VERSION}`.
+Redis container (`sakura-redis`), image `redis:${SAKURA_REDIS_VERSION}`.
 
 - `config/redis.conf`: no persistence (`save ""`, `appendonly no`), listens on
   all interfaces inside the compose network and disables protected mode because

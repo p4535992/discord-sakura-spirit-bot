@@ -37,9 +37,10 @@ cp .env.example .env
 
 Replace every `CHANGE_ME` value in `.env`: `SAKURA_BOT_DISCORD_TOKEN`,
 `SAKURA_BOT_DISCORD_CLIENT_ID`, `SAKURA_BOT_OPENAI_API_KEY` and
-`POSTGRES_PASSWORD`. `SAKURA_BOT_OWNER_ID` is optional. Every key is prefixed
-with the container that reads it (`SAKURA_BOT_*`, `POSTGRES_*`, `REDIS_*`,
-`PROXY_*`, `PROXY_LOGROTATE_*`), so the file stays grouped by service.
+`SAKURA_POSTGRES_PASSWORD`. `SAKURA_BOT_OWNER_ID` is optional. Every key is
+prefixed with the container that reads it (`SAKURA_BOT_*`,
+`SAKURA_POSTGRES_*`, `SAKURA_REDIS_*`, `SAKURA_PROXY_*`,
+`SAKURA_PROXY_LOGROTATE_*`), so the file stays grouped by service.
 The password must be alphanumeric because it is embedded in
 `SAKURA_BOT_DATABASE_URL` without escaping.
 
@@ -99,11 +100,11 @@ object also reads `../.env`, so the same file serves Compose and a host run.
 ```bash
 cd sakura-bot
 pytest                    # smoke and unit tests, no external service needed
-pytest -m integration     # requires POSTGRES_TEST_DATABASE_URL
+pytest -m integration     # requires SAKURA_POSTGRES_TEST_DATABASE_URL
 ```
 
 The integration fixture drops and recreates the schema, so
-`POSTGRES_TEST_DATABASE_URL` must reference a throwaway database.
+`SAKURA_POSTGRES_TEST_DATABASE_URL` must reference a throwaway database.
 
 ## 🤖 Usage
 
