@@ -1,0 +1,28 @@
+# Evidence-only override: exposes the bot health endpoint on the host loopback so
+# a browser (Playwright) can capture /health and /ready for the README.
+#
+# Why a relay: Docker cannot publish a port for a container attached only to an
+# internal network, and the bot must stay on `spacebar-backend` (no egress). The
+# `health-relay` forwarder sits on both networks, listens on 127.0.0.1 and only
+# forwards TCP to the bot; the bot itself keeps no route to the Internet.
+#
+# Do not use this file for a normal run: the base file deliberately publishes
+# nothing for the bot.
+#
+#   docker compose --env-file .env.spacebar \
+#     -f docker-compose.spacebar.yml -f docker-compose.spacebar.evidence.yml \
+#     up -d health-relay
+services:
+  health-relay:
+    image: alpine/socat:1.8.0.0
+    restart: "no"
+    command:
+      - TCP-LISTEN:8080,fork,reuseaddr
+      - TCP:sakura-bot-beta:8080
+    ports:
+      - "127.0.0.1:${SAKURA_BOT_HEALTH_PUBLISHED_PORT:-3004}:8080"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - spacebar-backend
+      - spacebar-edge

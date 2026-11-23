@@ -32,6 +32,7 @@ Le probe `/health` e `/ready` si leggono dall'interno dello stack (vedi sotto).
 | File | Ruolo | Versionato |
 |---|---|---|
 | `docker-compose.spacebar.yml` | Stack beta completo, progetto `sakura-spacebar-beta` | sì |
+| `docker-compose.spacebar.evidence.yml` | Relay `socat` che pubblica `/health` e `/ready` su `127.0.0.1:3004`, solo per gli screenshot del README | sì |
 | `.env.spacebar.example` | Modello delle variabili con placeholder | sì |
 | `.env.spacebar` | Valori locali reali (password, token del bot) | **no** (gitignored) |
 | `spacebar-beta/ai-mock/` | Stub OpenAI-compatibile, solo standard library | sì |

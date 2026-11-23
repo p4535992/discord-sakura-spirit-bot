@@ -126,6 +126,49 @@ cd sakura-bot && pytest -m integration
 docker compose -f docker-compose.test.yml down
 ```
 
+#### Full suite in Docker (integration included)
+
+The host run above skips the PostgreSQL integration test when
+`SAKURA_POSTGRES_TEST_DATABASE_URL` is not set. The isolated stack starts a
+throwaway PostgreSQL and Redis, so the same suite runs complete and nothing is
+skipped:
+
+```bash
+docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml up --build --abort-on-container-exit --exit-code-from sakura-test-runner sakura-test-runner
+docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml down
+```
+
+Verified result: **120 passed, 0 skipped** in 2.3 s. The integration test
+`tests/integration/test_user_creation_postgres.py::test_user_and_stats_are_persisted`
+runs against the throwaway cluster, after `tests/support/database_guard.py` has
+verified the URL and the marker row; the host run reports 119 passed and 1
+skipped because that variable is absent.
+
+#### Visual check of the running bot
+
+The bot has no graphical interface: its observable surface is the HTTP probe
+server. The screenshot below was captured with Playwright against the local
+Spacebar stack, with the bot connected to the local Spacebar gateway and to its
+own PostgreSQL and Redis.
+
+![Risposta di /ready del bot con tutti i controlli verdi](docs/images/spacebar-beta-ready.png)
+
+*Risposta reale di `/ready`, letta dal browser e formattata per leggibilità.*
+
+To reproduce it, start the stack and the evidence-only relay that publishes the
+probe on the host loopback. The bot itself keeps no published port and no route
+to the Internet: the relay forwards TCP to it from `127.0.0.1:3004`.
+
+```bash
+docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml up -d
+docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml -f docker-compose.spacebar.evidence.yml up -d health-relay
+# open http://127.0.0.1:3004/ready
+```
+
+The one-time Spacebar bootstrap is documented in `docs/SPACEBAR_BETA.md`; the
+verified compatibility matrix, including what is still unverified, is in
+`docs/SPACEBAR_COMPATIBILITY.md`.
+
 ## 🤖 Usage
 
 Once the bot is running and has joined your server, you can use the slash commands to interact with it. Start with `/sakura-help` to see a full list of commands.
