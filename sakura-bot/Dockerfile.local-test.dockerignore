@@ -1,0 +1,25 @@
+# Build-context filter for Dockerfile.local-test only.
+#
+# BuildKit prefers this file over .dockerignore when the build uses
+# Dockerfile.local-test, because the test image needs requirements-dev.txt,
+# pyproject.toml and tests, which the runtime image excludes on purpose.
+# The existing .dockerignore is left unchanged.
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+venv
+
+# Local runtime output and configuration
+logs
+*.log
+.env
+.env.*
+
+# Documentation and build files not needed inside the image
+*.md
+Dockerfile
+Dockerfile.local-test

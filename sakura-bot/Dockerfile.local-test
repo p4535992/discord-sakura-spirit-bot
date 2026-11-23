@@ -1,0 +1,44 @@
+# Test-only image for docker-compose.sakura-local-test.yml.
+#
+# It installs requirements-dev.txt on Python 3.13 and bakes the application
+# sources in, so the smoke tests can import them. The Compose stack mounts
+# ./tests read-only, so the tests always come from the clone under validation.
+#
+# This image never starts the bot: the fake credentials of the test stack are
+# not usable for Discord or OpenAI.
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TZ=Europe/Rome
+
+WORKDIR /app
+
+# Build tooling is needed only if a dependency has no wheel for this platform.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-dev.txt ./
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements-dev.txt
+
+COPY pyproject.toml ./
+COPY main.py ./
+COPY core ./core
+COPY commands ./commands
+COPY models ./models
+COPY systems ./systems
+COPY utils ./utils
+COPY tests ./tests
+
+# Unprivileged user; /app stays writable so pytest can use its cache directory.
+RUN useradd --create-home --uid 10001 sakura \
+    && mkdir -p /app/logs \
+    && chown -R sakura:sakura /app
+
+USER sakura
+
+CMD ["python", "-m", "pytest", "-v"]
