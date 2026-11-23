@@ -264,7 +264,7 @@ class AdminCommands(commands.Cog):
     
     @app_commands.command(name="admin-stats", description="View bot statistics")
     @app_commands.default_permissions(administrator=True)
-    async def bot_stats(self, interaction: discord.Interaction):
+    async def show_admin_stats(self, interaction: discord.Interaction):
         """Display bot statistics"""
         embed = SakuraEmbed.create_base(
             title="📊 Bot Statistics",

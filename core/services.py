@@ -3,13 +3,13 @@ Service layer for database operations
 """
 import logging
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import User, UserStats, Server
-from core.cache import set_user_cache, get_user_cache, set_server_cache, get_server_cache
+from core.cache import set_server_cache, set_user_cache
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,6 @@ class UserService:
     @staticmethod
     async def get_or_create_user(session: AsyncSession, discord_id: int, username: str) -> User:
         """Get existing user or create new one"""
-        # Try cache first
-        cached_user = await get_user_cache(discord_id, "profile")
-        
         # Query database
         result = await session.execute(
             select(User).where(User.discord_id == discord_id)
@@ -40,6 +37,11 @@ class UserService:
                 emotional_state="Blossoming"
             )
             session.add(user)
+            
+            # Flush assigns the autoincremented primary key before the dependent
+            # row is built; without it ``user.id`` is still None and the
+            # non-nullable ``user_stats.user_id`` foreign key fails.
+            await session.flush()
             
             # Create user stats
             stats = UserStats(user_id=user.id)
@@ -154,9 +156,6 @@ class ServerService:
     @staticmethod
     async def get_or_create_server(session: AsyncSession, discord_id: int, name: str) -> Server:
         """Get existing server or create new one"""
-        # Try cache first
-        cached_server = await get_server_cache(discord_id, "config")
-        
         # Query database
         result = await session.execute(
             select(Server).where(Server.discord_id == discord_id)

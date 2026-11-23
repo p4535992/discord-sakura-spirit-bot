@@ -1,48 +1,116 @@
 """
 Configuration management for Sakura Spirit Bot
+
+``.env`` is loaded by ``SettingsConfigDict`` itself, so the settings object is
+the single entry point for configuration and no separate ``load_dotenv`` call
+is required.
 """
-import os
 from typing import Optional
-from pydantic_settings import BaseSettings
+
 from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables"""
-    
+    """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
     # Discord Configuration
-    discord_token: str = Field(..., env="DISCORD_TOKEN")
-    discord_client_id: str = Field(..., env="DISCORD_CLIENT_ID")
-    bot_prefix: str = Field(default="!", env="BOT_PREFIX")
-    bot_owner_id: Optional[str] = Field(default=None, env="BOT_OWNER_ID")
-    
+    discord_token: str = Field(
+        ...,
+        description="Discord bot token, e.g. the value shown in the Developer Portal.",
+    )
+    discord_client_id: str = Field(
+        ...,
+        description="Discord application client ID, e.g. 123456789012345678.",
+    )
+    bot_prefix: str = Field(default="!", description="Legacy text command prefix, e.g. !.")
+    bot_owner_id: Optional[str] = Field(
+        default=None,
+        description="Discord user ID of the bot owner, e.g. 123456789012345678.",
+    )
+
     # Database Configuration
-    database_url: str = Field(..., env="DATABASE_URL")
-    
+    database_url: str = Field(
+        ...,
+        description="SQLAlchemy async URL, e.g. postgresql+asyncpg://user:pass@host:5432/db.",
+    )
+
     # Redis Configuration
-    redis_url: str = Field(..., env="REDIS_URL")
-    
+    redis_url: str = Field(
+        ...,
+        description="Redis URL used for caching, e.g. redis://localhost:6379/0.",
+    )
+    cache_required: bool = Field(
+        default=True,
+        description="Fail startup when Redis is unreachable; false enables degraded cache mode.",
+    )
+
     # OpenAI Configuration
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    
+    openai_api_key: str = Field(
+        ...,
+        description="OpenAI API key used by the spirit AI provider.",
+    )
+    openai_model: str = Field(
+        default="gpt-4.1-mini",
+        description="Chat completion model used by the spirit AI, e.g. gpt-4.1-mini.",
+    )
+    openai_timeout_seconds: float = Field(
+        default=20.0,
+        description="Timeout in seconds for a single AI request, e.g. 20.0.",
+    )
+
     # Riot Games API (Optional)
-    riot_api_key: Optional[str] = Field(default=None, env="RIOT_API_KEY")
-    
+    riot_api_key: Optional[str] = Field(
+        default=None,
+        description="Optional Riot Games API key; unused by the current commands.",
+    )
+
     # Environment
-    environment: str = Field(default="development", env="ENVIRONMENT")
-    
+    environment: str = Field(
+        default="development",
+        description="Deployment environment label, e.g. development or production.",
+    )
+    strict_startup: bool = Field(
+        default=True,
+        description="Abort startup when a required extension fails to load.",
+    )
+
+    # Health endpoint used by container orchestration
+    health_server_enabled: bool = Field(
+        default=True,
+        description="Expose the HTTP health endpoint used by Docker healthchecks.",
+    )
+    health_host: str = Field(
+        default="0.0.0.0",
+        description="Bind address of the health endpoint, e.g. 0.0.0.0.",
+    )
+    health_port: int = Field(
+        default=8080,
+        description="TCP port of the health endpoint, e.g. 8080.",
+    )
+
     # Feature Flags
-    enable_spirits: bool = Field(default=True, env="ENABLE_SPIRITS")
-    enable_weather: bool = Field(default=True, env="ENABLE_WEATHER")
-    enable_social: bool = Field(default=True, env="ENABLE_SOCIAL")
-    enable_gaming: bool = Field(default=True, env="ENABLE_GAMING")
-    enable_world: bool = Field(default=True, env="ENABLE_WORLD")
-    enable_gacha: bool = Field(default=True, env="ENABLE_GACHA")
-    enable_events: bool = Field(default=True, env="ENABLE_EVENTS")
-    
+    enable_spirits: bool = Field(default=True, description="Enable the spirit system.")
+    enable_weather: bool = Field(default=True, description="Enable the weather system.")
+    enable_social: bool = Field(default=True, description="Enable the social system.")
+    enable_gaming: bool = Field(default=True, description="Enable the gaming utilities.")
+    enable_world: bool = Field(default=True, description="Enable the Sakura Park world.")
+    enable_gacha: bool = Field(default=True, description="Enable the gacha system.")
+    enable_events: bool = Field(default=True, description="Enable global events.")
+
     # Logging
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
-    log_file: str = Field(default="logs/sakura_bot.log", env="LOG_FILE")
+    log_level: str = Field(default="INFO", description="Root log level, e.g. INFO or DEBUG.")
+    log_file: str = Field(
+        default="logs/sakura_bot.log",
+        description="Log file path; its parent directory is created at startup.",
+    )
     
     # Bot Behavior Settings
     command_timeout: int = 30  # seconds
@@ -100,11 +168,6 @@ class Settings(BaseSettings):
         "Moonborn",
         "Stormkin"
     ]
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
 
 
 # Global settings instance

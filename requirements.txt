@@ -1,39 +1,35 @@
+# Runtime dependencies, pinned for Python 3.13.
+# Install with: python -m pip install -r requirements.txt
+
 # Core Discord Bot
-discord.py==2.3.2
-python-dotenv==1.0.0
+discord.py==2.7.1
+python-dotenv==1.2.4
 
 # Database
-sqlalchemy==2.0.23
-asyncpg==0.29.0
-alembic==1.13.0
+sqlalchemy==2.0.58
+asyncpg==0.32.0
+alembic==1.20.1
 
-# Caching
-redis==5.0.1
-aioredis==2.0.1
+# Caching (redis.asyncio replaces the abandoned aioredis package)
+redis==7.4.1
 
 # AI & NLP
-openai==1.6.1
+openai==1.109.1
 
 # Task Scheduling
-APScheduler==3.10.4
+APScheduler==3.11.3
 
-# HTTP Client
-aiohttp==3.9.1
+# HTTP Client (also serves the health endpoint)
+aiohttp==3.14.5
 
 # Data Validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic==2.14.4
+pydantic-settings==2.16.3
 
 # Utilities
-python-dateutil==2.8.2
-pytz==2023.3
-colorlog==6.8.0
+python-dateutil==2.9.0.post0
+pytz==2026.6
+colorlog==6.12.0
 
 # Game API Integrations
-riotwatcher==3.3.2
-
-# Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
-black==23.12.1
-flake8==6.1.0
+riotwatcher==3.3.1

@@ -126,7 +126,10 @@ class UserInventory(Base):
     quantity = Column(Integer, default=1)
     equipped = Column(Boolean, default=False)
     
-    metadata = Column(JSON, nullable=True)  # Additional item data
+    # ``metadata`` is reserved by the SQLAlchemy declarative API, so the Python
+    # attribute uses a different name while the physical column keeps its
+    # original name to stay compatible with existing databases.
+    item_metadata = Column("metadata", JSON, nullable=True)
     acquired_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationship

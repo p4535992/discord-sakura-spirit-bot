@@ -1,0 +1,13 @@
+# Development and test dependencies.
+# Install with: python -m pip install -r requirements-dev.txt
+-r requirements.txt
+
+# Testing
+pytest==8.4.2
+pytest-asyncio==1.5.0
+# In-memory SQLite driver used by the ORM unit tests only.
+aiosqlite==0.21.0
+
+# Quality
+black==26.10.1
+flake8==7.5.0

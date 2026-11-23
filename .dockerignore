@@ -1,0 +1,29 @@
+# Keep the build context small and free of secrets.
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Local state and logs
+data
+logs
+*.log
+
+# Tests and tooling are not needed inside the runtime image
+tests
+pyproject.toml
+.flake8
+requirements-dev.txt
+
+# Documentation and local configuration
+*.md
+docs
+.env
+.env.*
+!.env.example

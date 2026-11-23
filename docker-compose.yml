@@ -1,0 +1,191 @@
+# Local stack: Discord bot + PostgreSQL, with Traefik and a logrotate sidecar.
+# Copy .env.example to .env, fill the secrets, then run:
+#   docker compose up -d --build
+name: sakura-spirit-bot
+
+services:
+  postgres:
+    image: "postgres:${POSTGRES_VERSION}"
+    container_name: sakura-postgres
+    restart: always
+    mem_limit: ${MEM_LIMIT_POSTGRES}
+    cpus: 1.0
+    environment:
+      TZ: Europe/Rome
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Keep the cluster in a subdirectory so the volume root stays clean.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      # Reachable only from the host loopback, never from the network.
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50M"
+        max-file: "5"
+    networks:
+      - sakura-platform
+
+  redis:
+    # Required by core/cache.py for LFG sessions and cooldowns. Removing this
+    # service requires CACHE_REQUIRED=false on the bot (degraded mode).
+    image: "redis:${REDIS_VERSION}"
+    container_name: sakura-redis
+    restart: always
+    mem_limit: ${MEM_LIMIT_REDIS}
+    cpus: 0.25
+    environment:
+      TZ: Europe/Rome
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10M"
+        max-file: "3"
+    networks:
+      - sakura-platform
+
+  bot:
+    image: sakura-spirit-bot:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sakura-bot
+    restart: always
+    mem_limit: ${MEM_LIMIT_BOT}
+    cpus: 1.0
+    environment:
+      TZ: Europe/Rome
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      BOT_PREFIX: ${BOT_PREFIX}
+      BOT_OWNER_ID: ${BOT_OWNER_ID}
+      # Built from the PostgreSQL service variables above.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      CACHE_REQUIRED: "true"
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ENVIRONMENT: ${ENVIRONMENT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      LOG_FILE: /var/log/sakura-bot/sakura_bot.log
+      STRICT_STARTUP: "true"
+      HEALTH_SERVER_ENABLED: "true"
+      HEALTH_HOST: 0.0.0.0
+      HEALTH_PORT: "8080"
+    volumes:
+      - ./logs/bot:/var/log/sakura-bot
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=4)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50M"
+        max-file: "5"
+    networks:
+      - sakura-platform
+
+  proxy:
+    image: "traefik:${TRAEFIK_VERSION}"
+    container_name: sakura-proxy
+    restart: always
+    mem_limit: ${MEM_LIMIT_PROXY}
+    cpus: 0.5
+    environment:
+      TZ: Europe/Rome
+    ports:
+      - "${TRAEFIK_HTTPS_PORT}:443"
+    volumes:
+      - ./logs/proxy:/var/log/traefik
+      - ./proxy/config/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./proxy/config/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      bot:
+        condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "50M"
+        max-file: "5"
+    networks:
+      - sakura-platform
+
+  proxy-logrotate:
+    image: sakura-spirit-bot/logrotate:local
+    build:
+      context: ./proxy-logrotate
+    container_name: sakura-proxy-logrotate
+    restart: always
+    mem_limit: ${MEM_LIMIT_PROXY}
+    cpus: 0.25
+    environment:
+      TZ: Europe/Rome
+    volumes:
+      - ./data/proxy-logrotate/state:/var/lib/logrotate
+      - ./logs/proxy:/var/log/traefik
+      - ./logs/bot:/var/log/sakura-bot
+      - ./logs/proxy-logrotate:/var/log/proxy-logrotate
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/opt/scripts/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      proxy:
+        condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "10M"
+        max-file: "3"
+    networks:
+      - sakura-platform
+
+networks:
+  sakura-platform:
+    driver: bridge

@@ -10,8 +10,22 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client
-client = AsyncOpenAI(api_key=settings.openai_api_key)
+_client: Optional[AsyncOpenAI] = None
+
+
+def _get_client() -> AsyncOpenAI:
+    """Create the OpenAI client on first use.
+
+    Building it lazily keeps module import free of network-related side effects
+    and lets tests import the module without a real API key.
+    """
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            timeout=settings.openai_timeout_seconds,
+        )
+    return _client
 
 
 class SpiritAI:
@@ -54,8 +68,8 @@ Guidelines:
 """
         
         try:
-            response = await client.chat.completions.create(
-                model="gpt-4.1-mini",
+            response = await _get_client().chat.completions.create(
+                model=settings.openai_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
@@ -66,8 +80,8 @@ Guidelines:
             
             return response.choices[0].message.content.strip()
         
-        except Exception as e:
-            logger.error(f"Error generating spirit response: {e}")
+        except Exception:
+            logger.exception("Error generating spirit response")
             return f"*{spirit_name} gazes at you silently, petals swirling around them* 🌸"
     
     @staticmethod
@@ -93,8 +107,8 @@ Create a JSON response with:
 Make it unique and fitting for a cherry blossom themed world."""
         
         try:
-            response = await client.chat.completions.create(
-                model="gpt-4.1-mini",
+            response = await _get_client().chat.completions.create(
+                model=settings.openai_model,
                 messages=[
                     {"role": "system", "content": "You are a creative game designer. Respond only with valid JSON."},
                     {"role": "user", "content": prompt}
@@ -113,8 +127,8 @@ Make it unique and fitting for a cherry blossom themed world."""
             
             return json.loads(content)
         
-        except Exception as e:
-            logger.error(f"Error generating spirit personality: {e}")
+        except Exception:
+            logger.exception("Error generating spirit personality")
             # Return default personality
             return {
                 "name": "Sakura",
@@ -175,8 +189,8 @@ appearing in the #{channel_name} channel during {weather} weather.
 Keep it under 100 characters, whimsical and engaging. Include an emoji."""
         
         try:
-            response = await client.chat.completions.create(
-                model="gpt-4.1-mini",
+            response = await _get_client().chat.completions.create(
+                model=settings.openai_model,
                 messages=[
                     {"role": "system", "content": "You are a creative writer for a mystical Discord bot."},
                     {"role": "user", "content": prompt}
@@ -215,10 +229,13 @@ Respond with JSON containing:
 Choose the state that best matches their emotional tone."""
         
         try:
-            response = await client.chat.completions.create(
-                model="gpt-4.1-mini",
+            response = await _get_client().chat.completions.create(
+                model=settings.openai_model,
                 messages=[
-                    {"role": "system", "content": "You are an emotional intelligence analyzer. Respond only with valid JSON."},
+                    {
+                        "role": "system",
+                        "content": "You are an emotional intelligence analyzer. Respond only with valid JSON.",
+                    },
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=100,

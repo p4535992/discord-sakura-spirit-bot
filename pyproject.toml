@@ -1,0 +1,10 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires a reachable PostgreSQL instance via SAKURA_TEST_DATABASE_URL",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]

@@ -1,0 +1,19 @@
+# Dynamic Traefik configuration, reloaded by the file provider.
+# The bot has no public HTTP API: Traefik only exposes its health endpoint so
+# the container can be probed through the proxy.
+http:
+  routers:
+    bot-health:
+      entryPoints:
+        - websecure
+      rule: "PathPrefix(`/`)"
+      priority: 1
+      service: bot
+      tls: {}
+
+  services:
+    bot:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://bot:8080"

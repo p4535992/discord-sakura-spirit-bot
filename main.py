@@ -7,20 +7,16 @@ import sys
 from pathlib import Path
 
 import colorlog
-from dotenv import load_dotenv
 
 from core.config import settings
 from core.bot import create_bot
 
-# Load environment variables
-load_dotenv()
-
 
 def setup_logging():
     """Configure logging with colors"""
-    # Create logs directory
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
+    # Create the directory that owns the configured log file.
+    log_dir = Path(settings.log_file).parent
+    log_dir.mkdir(parents=True, exist_ok=True)
     
     # Console handler with colors
     console_handler = colorlog.StreamHandler()

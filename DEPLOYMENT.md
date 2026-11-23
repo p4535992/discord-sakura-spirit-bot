@@ -105,84 +105,44 @@ The bot will automatically create all necessary database tables on first run.
 
 ## Production Deployment
 
-### Option 1: Docker Deployment (Recommended)
+### Option 1: Docker Compose (Recommended)
 
-Create a `Dockerfile`:
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \\
-    gcc \\
-    postgresql-client \\
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
-# Create logs directory
-RUN mkdir -p logs
-
-# Run the bot
-CMD ["python", "main.py"]
-```
-
-Create a `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  bot:
-    build: .
-    restart: unless-stopped
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - ./logs:/app/logs
-
-  postgres:
-    image: postgres:14-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: sakura_bot
-      POSTGRES_USER: sakura_user
-      POSTGRES_PASSWORD: your_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:
-```
-
-Deploy with Docker:
+The repository ships the complete stack; no Dockerfile has to be written.
 
 ```bash
-# Build and start
-docker-compose up -d
+cp .env.example .env      # fill every CHANGE_ME value
+docker compose up -d --build
+docker compose ps
+```
 
-# View logs
-docker-compose logs -f bot
+| Service | Image | Published port | Purpose |
+|---|---|---|---|
+| `bot` | built from `Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
+| `postgres` | `postgres:${POSTGRES_VERSION}` | `127.0.0.1:${POSTGRES_PORT}` | Database, bind mount `data/postgres` |
+| `redis` | `redis:${REDIS_VERSION}` | none | LFG sessions and cooldowns |
+| `proxy` | `traefik:${TRAEFIK_VERSION}` | `${TRAEFIK_HTTPS_PORT}` | TLS termination for the health endpoint |
+| `proxy-logrotate` | built from `proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
 
-# Stop
-docker-compose down
+Operational notes:
+
+- `CACHE_REQUIRED=true` is set in `docker-compose.yml`: the bot refuses to start
+  without Redis. Remove the `redis` service only after switching the variable to
+  `false`, which enables the degraded cache mode reported by `/ready`.
+- The bot image runs as UID 10001. On a Linux host create the log directory first
+  (`mkdir -p logs/bot && sudo chown 10001:10001 logs/bot`), otherwise Docker creates
+  it as root and the bot cannot write.
+- Traefik has no default certificate configured, so it generates a self-signed one.
+  Replace it with a real certificate before exposing the endpoint.
+- The Traefik dashboard and ping endpoint are bound to the container loopback and
+  are intentionally not published.
+
+Day-to-day commands:
+
+```bash
+docker compose logs -f bot
+docker compose exec bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
+curl -k https://localhost/health
+docker compose down          # keeps data/ and logs/
 ```
 
 ### Option 2: Systemd Service
@@ -228,18 +188,14 @@ sudo journalctl -u sakura-bot -f
 
 ## Database Migrations
 
-When updating the bot with schema changes, you may need to run migrations. Currently, the bot uses automatic table creation, but for production, consider using Alembic:
+Alembic is declared in `requirements.txt` but migrations are not configured yet:
+there is no `alembic.ini` and no `migrations/` directory. The schema is created
+at startup by `Base.metadata.create_all`, which only adds missing tables and
+never alters existing columns.
 
-```bash
-# Initialize Alembic (first time only)
-alembic init migrations
-
-# Create a migration
-alembic revision --autogenerate -m "Description of changes"
-
-# Apply migrations
-alembic upgrade head
-```
+Until migrations are introduced, a schema change requires a manual plan, for
+example a reviewed SQL script applied before deploying the new bot version.
+Treat migration tooling as pending work rather than an available feature.
 
 ## Monitoring and Maintenance
 

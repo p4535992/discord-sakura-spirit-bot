@@ -3,7 +3,7 @@ Spirit lifecycle and management system
 """
 import logging
 import random
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from sqlalchemy import select

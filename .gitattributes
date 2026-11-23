@@ -1,0 +1,55 @@
+# Testo normalizzato in LF, anche nei moduli figli.
+* text=auto eol=lf
+
+# Script Windows; gli altri file di testo mantengono LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh text eol=lf
+
+# Archivi e artefatti compilati.
+*.zip binary
+*.7z binary
+*.rar binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.jar binary
+*.war binary
+*.ear binary
+*.amp binary
+*.class binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Documenti binari e formati Office compressi.
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+*.odt binary
+*.ods binary
+*.odp binary
+
+# Immagini raster; SVG resta testo.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.webp binary
+
+# Font.
+*.ttf binary
+*.otf binary
+*.eot binary
+*.woff binary
+*.woff2 binary

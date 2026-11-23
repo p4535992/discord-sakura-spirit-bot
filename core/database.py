@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine,
@@ -13,6 +14,9 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+# Importing the models package registers every ORM class on ``Base.metadata``.
+# It must happen before ``create_all`` is called, otherwise the schema is empty.
+import models  # noqa: F401
 from models.base import Base
 from core.config import settings
 
@@ -43,8 +47,8 @@ class Database:
             )
             
             logger.info("Database connection established")
-        except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
+        except Exception:
+            logger.exception("Failed to connect to database")
             raise
     
     async def disconnect(self):
@@ -61,10 +65,22 @@ class Database:
         try:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database tables created successfully")
-        except Exception as e:
-            logger.error(f"Failed to create tables: {e}")
+            logger.info("Database tables ready: %s tables", len(Base.metadata.tables))
+        except Exception:
+            logger.exception("Failed to create database tables")
             raise
+
+    async def ping(self) -> bool:
+        """Return True when a trivial query succeeds; used by readiness probes."""
+        if not self.engine:
+            return False
+        try:
+            async with self.engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return True
+        except Exception:
+            logger.warning("Database readiness check failed", exc_info=True)
+            return False
     
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:

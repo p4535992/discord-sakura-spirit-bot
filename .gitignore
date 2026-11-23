@@ -1,74 +1,364 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# Environment Variables
-.env
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
+# IDE (la regola .vscode/ precede le eccezioni finali per la documentazione).
+*.code-workspace
+*-workspace
 .idea/
+*.idea
+*.iml
+*.iws
+*.ipr
+*.ids
+.project
+.classpath
+*.classpath
+.settings/
+settings/
+.metadata
+.factorypath
+.loadpath
+.buildpath
+.cproject
+*.pydevproject
+*.launch
+.externalToolBuilders/
+.sts4-cache/
+.apt_generated/
+.apt_generated_tests/
+.c9/
+.history/
+.zed
+.tern-project
+.recommenders/
+.springBeans
+.autotools
+.target
+.texlipse
+.cache-main
+.scala_dependencies
+.worksheet
+.idea_modules/
+*.sublime-workspace
+nb-configuration.xml
+RemoteSystemsTempFiles/
+local.properties
+
+# Build Java/Maven/Gradle/GWT e strumenti scaricati.
+build/
+bin/
+classes/
+out/
+deploy/
+.gradle/
+.spotless-cache/
+.build-tools/
+.jdk/
+.m2repo/
+apache-maven-[0-9]*/
+.flattened-pom.xml
+dependency-reduced-pom.xml
+buildNumber.properties
+pom.xml.next
+pom.xml.releaseBackup
+pom.xml.tag
+pom.xml.versionsBackup
+release.properties
+**/.mvn/timing.properties
+**/.mvn/config/jgit/config
+**/.mvn/toolchains_mvnw.xml
+maven-wrapper-pack.zip
+git*.properties
+.gwt/
+.gwt-tmp/
+gwt-unitCache/
+.mtj
+.mtj.tmp/
+www-test/
+gradle-app.setting
+.gradletasknamecache
+cmake-build-*/
+appengine-generated/
+catalina.base_IS_UNDEFINED/
+${maven.multiModuleProjectDirectory}/
+
+# Node, Angular e frontend.
+/node/
+node_tmp/
+node_modules/
+npm/
+bower_components/
+jspm_packages/
+.awcache/
+.cache-loader/
+.sass-cache/
+.eslintcache
+.dist
+/dist/
+dist-server/
+out-tsc/
+bazel-out/
+typings/
+**/.angular/cache/
+connect.lock
+
+# Compilati, pacchetti e database locali.
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.duckdb
+
+# Log, copertura e file temporanei.
+*.log
+*.log.[0-9]*
+*.log[0-9]*
+*.log-[0-9]*
+*.log.gz
+*.log.zip
+*.log.bz2
+*.log.xz
+*.log.zst
+log/
+coverage/
+.nyc_output/
+tmp/
+tmp_*
+.tmp*
+.tmp_*
+*.tmp
+*.orig
+*.rej
 *.swp
 *.swo
 *~
-.DS_Store
+*~.nib
+.#*
+*#
+.merge_file*
+hs_err_pid*
 
-# Logs
-logs/
-*.log
+# Python e dati di esecuzione Docker.
+__pycache__/
+*.py[cod]
+.venv/
+.runtime/
+.amp-test/
+alf_data/
+alf_data_dev/
+.certs/
+**/docker/.browsers/
+**/docker/accounts.local.json
+**/docker/results/
+**/docker/data/temp/
+**/docker/**/modules/amps/*.amp
+**/docker/**/modules/jars/*.amp
+**/.quarkus/cli/plugins/
+.openapi-generator/
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Redis
-dump.rdb
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Documentation builds
-docs/_build/
-
-# Backup files
-*.bak
-*.backup
-
-# OS
+# Sistema operativo e metadati di altri VCS.
+*.DS_Store
+.*DS_Store
 Thumbs.db
-.DS_Store
+Desktop.ini
+._*
+.Spotlight-V100
+.Trashes
+.svn
+.AppleDouble
+.LSOverride
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 
-# Project specific
-assets/temp/
-migrations/versions/*.pyc
+# Altri output e cache riutilizzabili, senza nomi di repository o moduli.
+docker-compose-tree.yml
+.hg/
+.hglf
+**/src/main/resources/rebel.xml
+.jhipster/
+nbbuild/
+nbdist/
+.nb-gradle/
+**/nbproject/private/
+.lein-deps-sum
+.lein-repl-history
+.lein-plugins/
+.lein-failures
+.nrepl-port
+.cpcache/
+**/.synthadoc/server.pid
+**/.synthadoc/last-vault-update.json
+*.rs.bk
+cargo-flamegraph.trace
+dhat.*
+flamegraph*.svg
+perf.data*
+profile.json*
+libreoffice-dist-*-linux.gz
+
+# Metadati IDE e compilati .NET.
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+[Bb]in/
+[Oo]bj/
+*.obj
+*.iobj
+*.pdb
+*.ipdb
+*.ilk
+*.pch
+*.pgc
+*.pgd
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp_proj
+*.vspscc
+*.vssscc
+*.pidb
+*.svclog
+*.cachefile
+*.opendb
+*.opensdf
+*.VC.VC.opendb
+*.psess
+*.vsp
+*.vspx
+*.DotSettings.user
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.dotCover
+*.coverage
+*.coveragexml
+_NCrunch_*/
+.*crunch*.local.xml
+nCrunchTemp_*/
+BenchmarkDotNet.Artifacts/
+
+# Log a ogni livello, conservando i file segnaposto.
+**/logs/**
+!**/logs/**/
+!**/logs/**/.gitkeep
+
+# Wrapper e package Java tmp: eccezioni indipendenti dal progetto.
+!**/.mvn/wrapper/maven-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+!**/src/main/java/**/tmp/
+!**/src/main/java/**/tmp/**/*.java
+
+# Backup generici versionabili fuori dalle directory runtime escluse.
+!*.bak
+
+# Solo bin/Bin: conserva .gitkeep e script *.sh espliciti anche annidati.
+# Le directory bin restano attraversabili; gli altri contenuti sono ignorati.
+bin/
+Bin/
+!**/[Bb]in/**/*.sh
+# target/ resta sempre esclusa nei normali output, anche se annidata in bin/.
+# Conserva le eccezioni generali successive per docs, src/main, src/test e opt.
+target/
+
+# Esclude .vscode; sotto doc/ e docs/ prevale la reinclusione seguente.
+.vscode/
+
+# Documentazione: include tutti i file e le sottocartelle a ogni livello.
+!**/doc/
+!**/doc/**
+!**/docs/
+!**/docs/**
+
+# JMeter: conserva esclusi la distribuzione scaricata e i risultati generati.
+**/doc/jmeter/app/apache-jmeter*/
+**/docs/jmeter/app/apache-jmeter*/
+**/doc/jmeter/tests/*/results/target/
+**/docs/jmeter/tests/*/results/target/
+**/doc/jmeter/tests/*/results/target-history/
+**/docs/jmeter/tests/*/results/target-history/
+
+# Memoria locale: esclusa anche sotto doc/ e docs/, salvo i sorgenti protetti.
+memory-bank/
+
+# Sorgenti e risorse protetti, salvo i metadati Git indicati sotto.
+!**/src/
+!**/src/main/
+!**/src/main/**
+!**/src/test/
+!**/src/test/**
+
+# Metadati Git: unica eccezione alla protezione dei sorgenti, anche nei moduli.
+**/src/main/resources/git-*.properties
+
+# Distribuzioni e risorse sotto opt: sempre versionabili, a ogni profondita.
+!**/opt/
+!**/opt/**
+
+# Asset locali degli agenti: esclusione definitiva a cascata, a ogni livello.
+# Posta dopo le reinclusioni di src, doc, docs, opt, bin e log per prevalere su di esse.
+.agents/
+.cline/
+.clinerules/
+.cursor
+.codex/
+.claude/
+.kilo/
+.roo/
+AGENTS.md
+
+# Configurazione locale con credenziali. Versionare soltanto il modello.
+/.env
+!/.env.sample
+
+# Runtime di tutti i container: mantenere solo i segnaposto.
+/data/**
+!/data/
+!/data/**/
+!/data/**/.gitkeep
+
+# Archivi con dati persistenti.
+/backups/
+
+# Prevenire l'aggiunta accidentale di vecchi certificati e chiavi.
+/proxy/config/cert/*.key
+/proxy/config/cert/*.crt
+/proxy/config/cert/*.cer
+
+# Non versionare credenziali JAAS e altri file segreti per servizio.
+**/secrets/**
+**/*_jaas.conf
+
+# Residui di autenticazione del precedente reverse proxy Nginx.
+**/nginx.htpasswd
+
+# Due progetti Compose indipendenti: configurazioni locali e output di runtime.
+**/.env
+!**/.env.sample
+**/data/**
+!**/data/
+!**/data/**/
+!**/data/**/.gitkeep
+**/logs/**
+!**/logs/
+!**/logs/**/
+!**/logs/**/.gitkeep
+**/backups/**
+**/secrets/**
+**/*_jaas.conf
+**/proxy/config/cert/*.cer
+**/proxy/config/cert/*.crt
+**/proxy/config/cert/*.key
+**/.compose-generation.*
