@@ -93,8 +93,10 @@ def test_spacebar_requires_gateway_url(env):
     ("name", "value"),
     [
         ("SAKURA_BOT_API_BASE_URL", "https://discord.com/api/v10"),
+        ("SAKURA_BOT_API_BASE_URL", "https://api.discord.com/api/v10"),
         ("SAKURA_BOT_API_BASE_URL", "https://api.openai.com/v1"),
         ("SAKURA_BOT_GATEWAY_URL", "wss://gateway.discord.gg/"),
+        ("SAKURA_BOT_ASSET_BASE_URL", "https://cdn.discordapp.com"),
     ],
 )
 def test_spacebar_rejects_public_service_hosts(env, name, value):
@@ -121,6 +123,28 @@ def test_discord_platform_keeps_library_defaults(env):
 
     assert Route.BASE == DISCORD_REST_BASE
     assert str(DiscordWebSocket.DEFAULT_GATEWAY) == DISCORD_GATEWAY
+
+
+def test_discord_platform_ignores_leftover_spacebar_endpoints(env):
+    """Production must not be redirected by variables left in the environment."""
+    env.setenv("SAKURA_BOT_API_BASE_URL", "http://spacebar-api:3001/api/v9")
+    env.setenv("SAKURA_BOT_GATEWAY_URL", "ws://spacebar-gateway:3001")
+    env.setenv("SAKURA_BOT_ASSET_BASE_URL", "http://spacebar-cdn:3001")
+
+    apply_platform_overrides(Settings())
+
+    assert Route.BASE == DISCORD_REST_BASE
+    assert str(DiscordWebSocket.DEFAULT_GATEWAY) == DISCORD_GATEWAY
+
+
+def test_platform_name_is_case_insensitive(env):
+    env.setenv("SAKURA_BOT_PLATFORM", "  SpaceBar  ")
+    env.setenv("SAKURA_BOT_API_BASE_URL", "http://spacebar-api:3001/api/v9")
+    env.setenv("SAKURA_BOT_GATEWAY_URL", "ws://spacebar-gateway:3001")
+
+    apply_platform_overrides(Settings())
+
+    assert Route.BASE == "http://spacebar-api:3001/api/v9"
 
 
 def test_spacebar_platform_patches_transport(env):
