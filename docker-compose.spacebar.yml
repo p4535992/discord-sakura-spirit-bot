@@ -1,0 +1,275 @@
+# Beta stack: Sakura Spirit Bot against a fully local Spacebar instance.
+#
+# Completely separate from docker-compose.yml (production) and from the two test
+# stacks: own project name, own networks, own volumes, own credentials. The bot
+# in this stack never talks to discord.com or api.openai.com.
+#
+# Images are pinned by digest because Spacebar publishes only the mutable
+# `latest` tag. Digests were resolved on 2026-11-23 from
+# `docker image inspect --format '{{index .RepoDigests 0}}'`.
+#
+#   docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml config --quiet
+#   docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml up -d --build
+#   docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml ps
+#   docker compose --env-file .env.spacebar -f docker-compose.spacebar.yml down
+name: sakura-spacebar-beta
+
+services:
+  # ---------------------------------------------------------------- Spacebar
+  spacebar-db:
+    image: postgres:18-alpine@sha256:0115267ab5a509022df9319c77be365cef335adb71556c75f60f5360ee247e71
+    restart: "no"
+    mem_limit: ${SPACEBAR_DB_MEM_LIMIT:-512m}
+    environment:
+      TZ: Europe/Rome
+      POSTGRES_PASSWORD: ${SPACEBAR_DB_PASSWORD:?set-a-local-spacebar-db-password}
+    volumes:
+      - spacebar-db:/var/lib/postgresql
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - spacebar-backend
+
+  rabbitmq:
+    # Spacebar uses RabbitMQ for inter-service events; it does not use Redis.
+    image: rabbitmq:4-management-alpine@sha256:fa8746831e6096fc9111365960e1e56871dd5d0d362af67fd48bd8d156aba818
+    restart: "no"
+    mem_limit: ${SPACEBAR_RABBITMQ_MEM_LIMIT:-384m}
+    environment:
+      TZ: Europe/Rome
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    networks:
+      - spacebar-backend
+
+  spacebar-gateway:
+    image: ghcr.io/spacebarchat/server-gateway@sha256:7d64708e22578f8f3f68add3543a6699bd102b9251b2dba77156c48111bcea27
+    restart: "no"
+    mem_limit: ${SPACEBAR_GATEWAY_MEM_LIMIT:-768m}
+    environment:
+      TZ: Europe/Rome
+      PORT: "3001"
+      DATABASE: postgres://postgres:${SPACEBAR_DB_PASSWORD:?set-a-local-spacebar-db-password}@spacebar-db/postgres
+      CONFIG_PATH: /data/config.json
+    volumes:
+      # Holds config.json and the generated JWT keys; bind mount so the files can
+      # be inspected and edited from Windows. Gitignored.
+      - ./spacebar-beta/data:/data
+    ports:
+      # Loopback only: the Windows browser (client) reaches it, the LAN does not.
+      - "127.0.0.1:${SPACEBAR_GATEWAY_PORT:-3001}:3001"
+    depends_on:
+      spacebar-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - spacebar-backend
+      - spacebar-edge
+
+  spacebar-api:
+    image: ghcr.io/spacebarchat/server-api@sha256:232dcf4cb89baea672b434da186dde7a2faab13c6942fbd2f1ccdb7a7ec1cb47
+    restart: "no"
+    mem_limit: ${SPACEBAR_API_MEM_LIMIT:-768m}
+    environment:
+      TZ: Europe/Rome
+      PORT: "3001"
+      DATABASE: postgres://postgres:${SPACEBAR_DB_PASSWORD:?set-a-local-spacebar-db-password}@spacebar-db/postgres
+      CONFIG_PATH: /data/config.json
+    volumes:
+      - ./spacebar-beta/data:/data
+    ports:
+      - "127.0.0.1:${SPACEBAR_API_PORT:-3002}:3001"
+    depends_on:
+      spacebar-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - spacebar-backend
+      - spacebar-edge
+
+  spacebar-cdn:
+    image: ghcr.io/spacebarchat/server-cdn@sha256:d686e573dd33b33259f8ec176d5c06ccd6f3043a1388cb76d308a27fb5d53369
+    restart: "no"
+    mem_limit: ${SPACEBAR_CDN_MEM_LIMIT:-512m}
+    environment:
+      TZ: Europe/Rome
+      PORT: "3001"
+      DATABASE: postgres://postgres:${SPACEBAR_DB_PASSWORD:?set-a-local-spacebar-db-password}@spacebar-db/postgres
+      CONFIG_PATH: /data/config.json
+      STORAGE_PROVIDER: file
+      STORAGE_LOCATION: /data/cdn
+    volumes:
+      - ./spacebar-beta/data:/data
+    ports:
+      - "127.0.0.1:${SPACEBAR_CDN_PORT:-3003}:3001"
+    depends_on:
+      spacebar-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - spacebar-backend
+      - spacebar-edge
+
+  # ------------------------------------------------- Sakura beta dependencies
+  sakura-postgres-beta:
+    image: postgres:16.15
+    restart: "no"
+    mem_limit: ${SAKURA_BETA_DB_MEM_LIMIT:-256m}
+    environment:
+      TZ: Europe/Rome
+      POSTGRES_DB: sakura_beta
+      POSTGRES_USER: sakura_beta
+      POSTGRES_PASSWORD: ${SAKURA_BETA_DB_PASSWORD:?set-a-local-beta-db-password}
+    volumes:
+      # Distinct persistent volume: manual tests can be repeated across restarts.
+      - sakura-beta-db:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sakura_beta -d sakura_beta"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - spacebar-backend
+
+  sakura-redis-beta:
+    image: redis:7-alpine
+    restart: "no"
+    mem_limit: ${SAKURA_BETA_REDIS_MEM_LIMIT:-96m}
+    environment:
+      TZ: Europe/Rome
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 96mb
+      - --maxmemory-policy
+      - allkeys-lru
+    tmpfs:
+      - /data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    networks:
+      - spacebar-backend
+
+  # ------------------------------------------------------------- AI test stub
+  ai-mock:
+    build:
+      context: ./spacebar-beta/ai-mock
+      dockerfile: Dockerfile
+    image: sakura-ai-mock:local
+    restart: "no"
+    mem_limit: ${AI_MOCK_MEM_LIMIT:-128m}
+    environment:
+      TZ: Europe/Rome
+      AI_MOCK_PORT: "8081"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8081/health',timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    networks:
+      - spacebar-backend
+
+  # -------------------------------------------------------------- Sakura bot
+  sakura-bot-beta:
+    build:
+      context: ./sakura-bot
+      dockerfile: Dockerfile
+    image: sakura-spirit-bot-beta:local
+    restart: "no"
+    mem_limit: ${SAKURA_BETA_BOT_MEM_LIMIT:-512m}
+    environment:
+      TZ: Europe/Rome
+      SAKURA_BOT_PLATFORM: spacebar
+      SAKURA_BOT_ENVIRONMENT: spacebar-beta
+      # Spacebar bot token, never a Discord token.
+      SAKURA_BOT_DISCORD_TOKEN: ${SPACEBAR_BOT_TOKEN:?create-the-bot-in-spacebar-first}
+      SAKURA_BOT_DISCORD_CLIENT_ID: ${SPACEBAR_BOT_CLIENT_ID:?create-the-bot-in-spacebar-first}
+      # Internal endpoints: container-to-container, never the public ones.
+      # Spacebar serves API versions 6-9; v10 is not in its activeVersions.
+      SAKURA_BOT_API_BASE_URL: http://spacebar-api:3001/api/v9
+      SAKURA_BOT_GATEWAY_URL: ws://spacebar-gateway:3001
+      SAKURA_BOT_ASSET_BASE_URL: http://spacebar-cdn:3001
+      SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://sakura_beta:${SAKURA_BETA_DB_PASSWORD:?set-a-local-beta-db-password}@sakura-postgres-beta:5432/sakura_beta
+      SAKURA_BOT_REDIS_URL: redis://sakura-redis-beta:6379/0
+      SAKURA_BOT_CACHE_REQUIRED: "true"
+      # Sentinel key: the SDK is pointed at the local stub, which has no egress.
+      SAKURA_BOT_OPENAI_API_KEY: local-mock-key
+      SAKURA_BOT_OPENAI_BASE_URL: http://ai-mock:8081/v1
+      SAKURA_BOT_OPENAI_MODEL: local-mock-model
+      SAKURA_BOT_HEALTH_SERVER_ENABLED: "true"
+      SAKURA_BOT_HEALTH_HOST: 0.0.0.0
+      SAKURA_BOT_HEALTH_PORT: "8080"
+      SAKURA_BOT_STRICT_STARTUP: "true"
+      SAKURA_BOT_LOG_LEVEL: INFO
+    depends_on:
+      sakura-postgres-beta:
+        condition: service_healthy
+      sakura-redis-beta:
+        condition: service_healthy
+      ai-mock:
+        condition: service_healthy
+      spacebar-api:
+        condition: service_started
+      spacebar-gateway:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      # Backend only: no route to the Internet, so discord.com and api.openai.com
+      # are unreachable even if a configuration mistake pointed at them.
+      # A published port is deliberately absent: Docker cannot expose ports from
+      # an internal network, and the probes are read from inside the stack with
+      # `docker compose exec` (see docs/SPACEBAR_BETA.md).
+      - spacebar-backend
+
+networks:
+  spacebar-backend:
+    driver: bridge
+    # The bot lives here: no egress, only container-to-container traffic.
+    internal: true
+  spacebar-edge:
+    driver: bridge
+
+volumes:
+  spacebar-db:
+  rabbitmq-data:
+  sakura-beta-db:

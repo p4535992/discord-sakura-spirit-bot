@@ -10,6 +10,7 @@ import colorlog
 
 from core.config import settings
 from core.bot import create_bot
+from core.platform import PlatformConfigurationError, apply_platform_overrides
 
 
 def setup_logging():
@@ -62,9 +63,19 @@ async def main():
     logger.info("🌸 Starting Sakura Spirit Bot 🌸")
     logger.info("=" * 60)
     logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Platform: {settings.platform}")
     logger.info(f"Prefix: {settings.bot_prefix}")
     logger.info(f"Features enabled: Spirits={settings.enable_spirits}, Weather={settings.enable_weather}")
-    
+
+    # Redirect the transport before the client exists: the REST base and the
+    # gateway must be in place before the first call, and an invalid platform
+    # configuration must stop the process instead of reaching another service.
+    try:
+        apply_platform_overrides(settings)
+    except PlatformConfigurationError as error:
+        logger.critical(f"Invalid platform configuration: {error}")
+        sys.exit(1)
+
     bot = create_bot()
     
     try:

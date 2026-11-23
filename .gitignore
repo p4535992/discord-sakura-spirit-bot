@@ -362,3 +362,8 @@ AGENTS.md
 **/sakura-proxy/config/cert/*.crt
 **/sakura-proxy/config/cert/*.key
 **/.compose-generation.*
+
+# Stack beta Spacebar: configurazione locale e dati di runtime generati.
+# Il modello versionabile resta .env.spacebar.example.
+/.env.spacebar
+/spacebar-beta/data/

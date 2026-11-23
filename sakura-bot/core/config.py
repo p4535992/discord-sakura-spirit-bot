@@ -60,6 +60,28 @@ class Settings(BaseSettings):
         description="Discord user ID of the bot owner, e.g. 123456789012345678.",
     )
 
+    # Platform / transport selection
+    platform: str = Field(
+        default="discord",
+        validation_alias=_bot_env("PLATFORM"),
+        description="Chat platform to connect to: discord or spacebar, e.g. discord.",
+    )
+    api_base_url: Optional[str] = Field(
+        default=None,
+        validation_alias=_bot_env("API_BASE_URL"),
+        description="REST base override; required by spacebar, e.g. http://spacebar-api:3001/api/v9.",
+    )
+    gateway_url: Optional[str] = Field(
+        default=None,
+        validation_alias=_bot_env("GATEWAY_URL"),
+        description="Gateway override; required by spacebar, e.g. ws://spacebar-gateway:3001/.",
+    )
+    asset_base_url: Optional[str] = Field(
+        default=None,
+        validation_alias=_bot_env("ASSET_BASE_URL"),
+        description="CDN base override for avatars and icons, e.g. http://spacebar-cdn:3001.",
+    )
+
     # Database Configuration
     database_url: str = Field(
         ...,
@@ -94,6 +116,11 @@ class Settings(BaseSettings):
         default=20.0,
         validation_alias=_bot_env("OPENAI_TIMEOUT_SECONDS"),
         description="Timeout in seconds for a single AI request, e.g. 20.0.",
+    )
+    openai_base_url: Optional[str] = Field(
+        default=None,
+        validation_alias=_bot_env("OPENAI_BASE_URL"),
+        description="Override of the OpenAI API base, e.g. http://ai-mock:8081/v1 for the local stub.",
     )
 
     # Riot Games API (Optional)

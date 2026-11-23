@@ -17,14 +17,18 @@ def _get_client() -> AsyncOpenAI:
     """Create the OpenAI client on first use.
 
     Building it lazily keeps module import free of network-related side effects
-    and lets tests import the module without a real API key.
+    and lets tests import the module without a real API key. ``base_url`` is
+    only set when configured, so production keeps the SDK default.
     """
     global _client
     if _client is None:
-        _client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            timeout=settings.openai_timeout_seconds,
-        )
+        options = {
+            "api_key": settings.openai_api_key,
+            "timeout": settings.openai_timeout_seconds,
+        }
+        if settings.openai_base_url:
+            options["base_url"] = settings.openai_base_url
+        _client = AsyncOpenAI(**options)
     return _client
 
 
