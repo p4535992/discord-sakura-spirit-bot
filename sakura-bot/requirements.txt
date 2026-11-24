@@ -10,8 +10,7 @@ sqlalchemy==2.0.58
 asyncpg==0.32.0
 alembic==1.20.1
 
-# Caching (redis.asyncio replaces the abandoned aioredis package)
-redis==7.4.1
+# Caching is in-process (core/cache.py): no Redis client is required.
 
 # AI & NLP
 openai==1.109.1

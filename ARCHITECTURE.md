@@ -5,8 +5,8 @@
 ### Core Framework
 - **Discord.py** (v2.3+): Primary Discord API wrapper
 - **Python 3.11+**: Runtime environment
-- **PostgreSQL**: Primary persistent storage
-- **Redis**: Caching and real-time state management
+- **PostgreSQL**: Primary persistent storage, including LFG sessions and ritual cooldowns
+- **In-process TTL cache**: Rebuildable read-through data, no external service
 
 ### AI & Intelligence
 - **OpenAI API**: Spirit personality generation, dream content, lore generation
@@ -43,8 +43,8 @@
         ┌─────────────────────┴─────────────────────┐
         │                                           │
 ┌───────▼────────┐                      ┌──────────▼─────────┐
-│   PostgreSQL   │                      │      Redis         │
-│  (Persistence) │                      │   (Real-time)      │
+│   PostgreSQL   │                      │  In-process cache  │
+│  (Persistence) │                      │   (Rebuildable)    │
 └────────────────┘                      └────────────────────┘
 ```
 
@@ -59,7 +59,8 @@ image build context.
 - `bot.py`: Main bot instance and initialization
 - `config.py`: Configuration management
 - `database.py`: Database connection and session management
-- `cache.py`: Redis connection and caching utilities
+- `cache.py`: in-process TTL cache for rebuildable data
+- `lfg_repository.py`: LFG sessions and ritual cooldowns in PostgreSQL
 - `events.py`: Global event listeners
 
 #### Command System (`commands/`)
@@ -251,20 +252,32 @@ image build context.
 - outcome_json
 - timestamp
 
-## Real-Time Systems (Redis)
+## Cache and Game State
 
-### Cache Keys Structure
+### Cache keys (in-process, TTL, rebuildable)
 ```
-server:{server_id}:weather:current
-server:{server_id}:harmony:score
-server:{server_id}:active_users
-user:{user_id}:emotional_state
-user:{user_id}:daily_dream
-spirit:roaming:schedule
-event:active:{event_id}
-lfg:queue:{game_type}
-ritual:active:{ritual_id}
+server:{server_id}:config
+server:{server_id}:harmony
+server:{server_id}:weather
+user:{user_id}:profile
+user:{user_id}:currency
 ```
+
+The cache lives in the bot process and is bounded (2048 entries by default). It
+is **not** shared between processes or replicas, and every value can be rebuilt
+from PostgreSQL.
+
+### Persistent game state (PostgreSQL)
+```
+lfg_sessions      (guild_id, message_id, channel_id, creator_id, game,
+                   party_size, status, created_at, expires_at)
+lfg_members       (session_id, discord_user_id, joined_at)
+ritual_cooldowns  (discord_user_id, expires_at)
+```
+
+LFG sessions and ritual cooldowns were Redis keys with a TTL; they are game
+state, so they are rows and survive a restart. An accepted join renews the LFG
+window (3600 s) and the ritual cooldown is 1800 s per user, global across guilds.
 
 ## Event-Driven Architecture
 
@@ -286,7 +299,7 @@ ritual:active:{ritual_id}
 ## Scalability Considerations
 
 ### Performance Optimizations
-1. **Caching Strategy**: Frequently accessed data in Redis
+1. **Caching Strategy**: Rebuildable read-through data in the in-process cache
 2. **Database Indexing**: Optimize queries on user_id, server_id
 3. **Async Operations**: All I/O operations asynchronous
 4. **Rate Limiting**: Respect Discord API limits
@@ -316,31 +329,34 @@ ritual:active:{ritual_id}
 ┌─────────────────────────────────────────────────┐
 │              Docker Container                    │
 │  ┌───────────────────────────────────────┐     │
-│  │      Sakura Spirit Bot Process        │     │
+│  │  Sakura Spirit Bot Process            │     │
+│  │  (in-process TTL cache)               │     │
 │  └───────────────────────────────────────┘     │
 └─────────────────────────────────────────────────┘
                     │
-        ┌───────────┼───────────┐
-        │           │           │
-┌───────▼────┐ ┌───▼─────┐ ┌──▼──────┐
-│ PostgreSQL │ │  Redis  │ │ OpenAI  │
-│  Database  │ │  Cache  │ │   API   │
-└────────────┘ └─────────┘ └─────────┘
+        ┌───────────┴───────────┐
+        │                       │
+┌───────▼────┐          ┌───────▼─────┐
+│ PostgreSQL │          │  OpenAI API │
+│  Database  │          │  (outbound) │
+└────────────┘          └─────────────┘
 ```
+
+The bot connects **outbound** to the Discord Gateway and to the OpenAI API: there
+is no inbound proxy, no Redis and no log-rotation sidecar. Logs go to
+stdout/stderr and are rotated by the Docker `json-file` driver.
 
 ### Environment Variables
 ```
 SAKURA_BOT_DISCORD_TOKEN
 SAKURA_BOT_OPENAI_API_KEY
 SAKURA_BOT_DATABASE_URL
-SAKURA_BOT_REDIS_URL
 SAKURA_BOT_ENVIRONMENT (development/production)
 ```
 
 Variables are prefixed with the container that reads them (`SAKURA_BOT_*`,
-`SAKURA_POSTGRES_*`, `SAKURA_REDIS_*`, `SAKURA_PROXY_*`,
-`SAKURA_PROXY_LOGROTATE_*`); Compose maps the PostgreSQL keys to the
-`POSTGRES_*` names the official image requires.
+`SAKURA_POSTGRES_*`); Compose maps the PostgreSQL keys to the `POSTGRES_*` names
+the official image requires.
 
 ## Development Phases
 

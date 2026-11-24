@@ -1,4 +1,8 @@
-# Local stack: Discord bot + PostgreSQL, with Traefik and a logrotate sidecar.
+# Local stack: Discord bot + PostgreSQL only.
+# The cache is in-process, the bot logs to stdout (Docker rotates it) and there
+# is no inbound proxy: the bot connects outbound to the Discord Gateway, so no
+# HTTPS endpoint is needed. Readiness is queried from inside the container with
+# `docker compose exec`.
 # Copy .env.example to .env, fill the secrets, then run:
 #   docker compose up -d --build
 name: sakura-spirit-bot
@@ -41,37 +45,6 @@ services:
     networks:
       - sakura-platform
 
-  sakura-redis:
-    # Required by core/cache.py for LFG sessions and cooldowns. Removing this
-    # service requires SAKURA_BOT_CACHE_REQUIRED=false on the bot (degraded mode).
-    image: "redis:${SAKURA_REDIS_VERSION}"
-    container_name: sakura-redis
-    restart: always
-    mem_limit: ${SAKURA_REDIS_MEM_LIMIT}
-    cpus: 0.25
-    environment:
-      TZ: Europe/Rome
-    # Configuration lives in sakura-redis/config/redis.conf: no persistence, protected
-    # mode disabled because the port is not published on the host.
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
-    volumes:
-      - ./sakura-redis/config/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10M"
-        max-file: "3"
-    networks:
-      - sakura-platform
-
   sakura-bot:
     image: sakura-spirit-bot:local
     build:
@@ -91,12 +64,9 @@ services:
       SAKURA_BOT_OWNER_ID: ${SAKURA_BOT_OWNER_ID}
       # Built from the PostgreSQL service variables above.
       SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://${SAKURA_POSTGRES_USER}:${SAKURA_POSTGRES_PASSWORD}@sakura-postgres:5432/${SAKURA_POSTGRES_DB}
-      SAKURA_BOT_REDIS_URL: redis://sakura-redis:6379/0
-      SAKURA_BOT_CACHE_REQUIRED: "true"
       SAKURA_BOT_OPENAI_API_KEY: ${SAKURA_BOT_OPENAI_API_KEY}
       SAKURA_BOT_ENVIRONMENT: ${SAKURA_BOT_ENVIRONMENT}
       SAKURA_BOT_LOG_LEVEL: ${SAKURA_BOT_LOG_LEVEL}
-      SAKURA_BOT_LOG_FILE: /var/log/sakura-bot/sakura_bot.log
       SAKURA_BOT_STRICT_STARTUP: "true"
       SAKURA_BOT_HEALTH_SERVER_ENABLED: "true"
       SAKURA_BOT_HEALTH_HOST: "0.0.0.0"
@@ -108,15 +78,12 @@ services:
       SAKURA_BOT_ENABLE_WORLD: ${SAKURA_BOT_ENABLE_WORLD}
       SAKURA_BOT_ENABLE_GACHA: ${SAKURA_BOT_ENABLE_GACHA}
       SAKURA_BOT_ENABLE_EVENTS: ${SAKURA_BOT_ENABLE_EVENTS}
-    volumes:
-      # Named volume: the directory created in the image keeps UID 10001.
-      - sakura-bot-logs:/var/log/sakura-bot
+    # No log volume: the application writes to stdout/stderr and Docker rotates
+    # the json-file output with the limits below.
     security_opt:
       - no-new-privileges:true
     depends_on:
       sakura-postgres:
-        condition: service_healthy
-      sakura-redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -131,77 +98,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "50M"
-        max-file: "5"
-    networks:
-      - sakura-platform
-
-  sakura-proxy:
-    image: "traefik:${SAKURA_PROXY_TRAEFIK_VERSION}"
-    container_name: sakura-proxy
-    restart: always
-    mem_limit: ${SAKURA_PROXY_MEM_LIMIT}
-    cpus: 0.5
-    environment:
-      TZ: Europe/Rome
-    ports:
-      # Loopback only: the local profile must not publish the endpoint on the
-      # host network interfaces. Publish it on a specific address only after
-      # deciding to expose it, with a real certificate and access control.
-      - "127.0.0.1:${SAKURA_PROXY_HTTPS_PORT}:443"
-    volumes:
-      - sakura-proxy-logs:/var/log/traefik
-      - ./sakura-proxy/config/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./sakura-proxy/config/dynamic.yml:/etc/traefik/dynamic.yml:ro
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "traefik", "healthcheck", "--ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    depends_on:
-      sakura-bot:
-        condition: service_started
-    logging:
-      driver: json-file
-      options:
-        max-size: "50M"
-        max-file: "5"
-    networks:
-      - sakura-platform
-
-  sakura-proxy-logrotate:
-    image: sakura-spirit-bot/logrotate:local
-    build:
-      context: ./sakura-proxy-logrotate
-    container_name: sakura-proxy-logrotate
-    restart: always
-    mem_limit: ${SAKURA_PROXY_LOGROTATE_MEM_LIMIT}
-    cpus: 0.25
-    environment:
-      TZ: Europe/Rome
-    volumes:
-      - sakura-proxy-logrotate-state:/var/lib/logrotate
-      - sakura-proxy-logrotate-logs:/var/log/sakura-proxy-logrotate
-      # Shared with the bot and Traefik: the sidecar rotates their files in place.
-      - sakura-bot-logs:/var/log/sakura-bot
-      - sakura-proxy-logs:/var/log/traefik
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "/bin/sh", "/opt/scripts/healthcheck.sh"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    depends_on:
-      sakura-proxy:
-        condition: service_started
-    logging:
-      driver: json-file
-      options:
+        # Per-file size and number of files kept: a bound on disk usage, not on
+        # the memory of the container.
         max-size: "10M"
         max-file: "3"
     networks:
@@ -212,11 +110,10 @@ volumes:
   # Docker keeps it in its data root (relocatable to another disk through the
   # daemon configuration); `docker compose down -v` deletes it. Compose prefixes
   # the real names with the project name (`sakura-spirit-bot_<volume>`).
+  # The former sakura-bot-logs, sakura-proxy-logs and sakura-proxy-logrotate-*
+  # volumes are no longer declared: they are not deleted automatically, so the
+  # old files stay available until the operator removes them.
   sakura-postgres-data:
-  sakura-bot-logs:
-  sakura-proxy-logs:
-  sakura-proxy-logrotate-state:
-  sakura-proxy-logrotate-logs:
 
 networks:
   sakura-platform:

@@ -10,7 +10,7 @@ This implementation includes a fully functional Discord bot with the following m
 
 ### Core Infrastructure
 
-The bot is built on a robust, scalable architecture using modern Python async patterns. The core infrastructure includes a modular command system using Discord.py's cog architecture, async database operations with SQLAlchemy and PostgreSQL, Redis-based caching for real-time data, comprehensive logging and error handling, and environment-based configuration management.
+The bot is built on a robust, scalable architecture using modern Python async patterns. The core infrastructure includes a modular command system using Discord.py's cog architecture, async database operations with SQLAlchemy and PostgreSQL, an in-process TTL cache for rebuildable data, comprehensive logging and error handling, and environment-based configuration management.
 
 ### Implemented Features
 
@@ -42,14 +42,14 @@ OpenAI integration powers spirit personality generation, contextual dialogue res
 
 - **Framework**: Discord.py 2.3.2 with full async support
 - **Database**: PostgreSQL with SQLAlchemy ORM
-- **Caching**: Redis for real-time data
+- **Caching**: In-process TTL cache (no external service)
 - **AI**: OpenAI API (GPT-4.1-mini)
 - **Language**: Python 3.11+
 - **Task Scheduling**: APScheduler for automated events
 
 ### Architecture Highlights
 
-The bot uses a modular cog-based command system for easy feature management. All database operations are asynchronous for optimal performance. Redis caching reduces database load and improves response times. The configuration system uses environment variables with Pydantic validation. Comprehensive logging tracks all operations and errors.
+The bot uses a modular cog-based command system for easy feature management. All database operations are asynchronous for optimal performance. The in-process cache reduces database load for rebuildable data, while LFG sessions and ritual cooldowns are stored in PostgreSQL so a restart cannot lose them. The configuration system uses environment variables with Pydantic validation. Comprehensive logging tracks all operations and errors.
 
 ### Code Organization
 
@@ -104,7 +104,7 @@ The bot is production-ready with proper error handling, rate limiting, and loggi
 
 ## Performance Considerations
 
-The implementation includes several optimizations: async operations prevent blocking, Redis caching reduces database queries, connection pooling manages database connections efficiently, and rate limiting respects Discord API limits.
+The implementation includes several optimizations: async operations prevent blocking, the in-process cache reduces database queries for rebuildable data, connection pooling manages database connections efficiently, and rate limiting respects Discord API limits.
 
 ## Security Features
 
@@ -155,7 +155,7 @@ To get started with your Sakura Spirit Bot:
 
 1. Review the SETUP_GUIDE.md for detailed installation instructions
 2. Configure your environment variables in the .env file
-3. Set up PostgreSQL and Redis servers
+3. Set up the PostgreSQL server (LFG sessions and cooldowns live there too)
 4. Run the bot and test basic commands
 5. Invite the bot to your Discord server
 6. Customize features based on your community's preferences

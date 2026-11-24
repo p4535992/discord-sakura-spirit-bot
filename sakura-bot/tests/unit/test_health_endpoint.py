@@ -1,7 +1,7 @@
 """Liveness and readiness probe tests.
 
 The probes are driven with fakes: no Discord connection, no database and no
-Redis server is contacted. ``aiohttp.test_utils`` binds an ephemeral loopback
+remote cache is contacted. ``aiohttp.test_utils`` binds an ephemeral loopback
 port, so the tests stay offline.
 """
 
@@ -52,13 +52,11 @@ async def make_probe(monkeypatch):
         bot_ready: bool = True,
         database_ready: bool = True,
         cache_ready: bool = True,
-        cache_required: bool = True,
         bootstrap_complete: bool = True,
         startup_failures: list[str] | None = None,
     ):
         monkeypatch.setattr(health_module, "db", FakeDatabase(database_ready))
         monkeypatch.setattr(health_module, "cache", FakeCache(cache_ready))
-        monkeypatch.setattr(health_module.settings, "cache_required", cache_required)
 
         server = HealthServer()
         server.attach(FakeBot(bot_ready))
@@ -123,8 +121,9 @@ async def test_ready_is_503_when_the_database_is_down(make_probe):
     assert payload["checks"]["database"] is False
 
 
-async def test_ready_is_503_when_redis_is_required_and_down(make_probe):
-    client, _ = await make_probe(cache_ready=False, cache_required=True)
+async def test_ready_is_503_when_the_local_cache_is_not_initialised(make_probe):
+    """The in-process cache is part of the bootstrap, so it must be up."""
+    client, _ = await make_probe(cache_ready=False)
 
     response = await client.get("/ready")
     payload = await response.json()
@@ -133,15 +132,14 @@ async def test_ready_is_503_when_redis_is_required_and_down(make_probe):
     assert payload["checks"]["cache"] is False
 
 
-async def test_ready_reports_degraded_when_redis_is_optional_and_down(make_probe):
-    client, _ = await make_probe(cache_ready=False, cache_required=False)
+async def test_ready_never_reports_degraded(make_probe):
+    """There is no degraded mode any more: readiness is ready or not_ready."""
+    client, _ = await make_probe(cache_ready=False)
 
     response = await client.get("/ready")
     payload = await response.json()
 
-    assert response.status == 200
-    assert payload["status"] == "degraded"
-    assert payload["checks"]["cache"] is False
+    assert payload["status"] == "not_ready"
 
 
 async def test_ready_is_503_while_the_bootstrap_is_incomplete(make_probe):

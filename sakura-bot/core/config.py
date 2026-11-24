@@ -115,17 +115,9 @@ class Settings(BaseSettings):
         description="SQLAlchemy async URL, e.g. postgresql+asyncpg://user:pass@host:5432/db.",
     )
 
-    # Redis Configuration
-    redis_url: str = Field(
-        ...,
-        validation_alias=_bot_env("REDIS_URL"),
-        description="Redis URL used for caching, e.g. redis://localhost:6379/0.",
-    )
-    cache_required: bool = Field(
-        default=True,
-        validation_alias=_bot_env("CACHE_REQUIRED"),
-        description="Fail startup when Redis is unreachable; false enables degraded cache mode.",
-    )
+    # The cache is in-process (``core/cache.py``): there is no Redis URL and no
+    # cache flag to configure. LFG sessions and ritual cooldowns are game state
+    # and live in PostgreSQL (``core/lfg_repository.py``).
 
     # OpenAI Configuration
     openai_api_key: Optional[str] = Field(
@@ -236,11 +228,8 @@ class Settings(BaseSettings):
         validation_alias=_bot_env("LOG_LEVEL"),
         description="Root log level, e.g. INFO or DEBUG.",
     )
-    log_file: str = Field(
-        default="logs/sakura_bot.log",
-        validation_alias=_bot_env("LOG_FILE"),
-        description="Log file path; its parent directory is created at startup.",
-    )
+    # No log file: the application writes to stdout/stderr and Docker rotates
+    # the json-file driver output (max-size/max-file in the Compose files).
     
     # Bot Behavior Settings
     command_timeout: int = 30  # seconds

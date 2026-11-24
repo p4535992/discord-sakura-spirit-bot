@@ -40,11 +40,10 @@ COPY models ./models
 COPY systems ./systems
 COPY utils ./utils
 
-# Unprivileged runtime user; the log directory is created here so a named
-# volume inherits the correct ownership.
+# Unprivileged runtime user. No log directory is created: the application writes
+# to stdout/stderr and Docker rotates the json-file output.
 RUN useradd --create-home --uid 10001 sakura \
-    && mkdir -p /var/log/sakura-bot \
-    && chown -R sakura:sakura /app /var/log/sakura-bot
+    && chown -R sakura:sakura /app
 
 USER sakura
 

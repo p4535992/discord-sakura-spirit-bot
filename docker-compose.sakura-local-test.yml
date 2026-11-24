@@ -1,9 +1,10 @@
 # Isolated local test stack for the existing Python test suite.
 #
 # It is independent from docker-compose.yml and docker-compose.test.yml: own
-# project name, own internal network, own throwaway PostgreSQL and Redis, no
-# host-published port, no shared volume. The bot itself is never started, so the
-# fake credentials in .env.sakura-local-test cannot reach Discord or OpenAI.
+# project name, own internal network, own throwaway PostgreSQL, no host-published
+# port, no shared volume. The bot itself is never started, so the fake
+# credentials in .env.sakura-local-test cannot reach Discord or OpenAI. The cache
+# is in-process, so the suite needs no Redis container.
 #
 #   docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml config --quiet
 #   docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml up --build --abort-on-container-exit --exit-code-from sakura-test-runner sakura-test-runner
@@ -43,37 +44,6 @@ services:
     networks:
       - sakura-local-test
 
-  sakura-redis-test:
-    image: "redis:${SAKURA_REDIS_VERSION:-7-alpine}"
-    restart: "no"
-    mem_limit: ${SAKURA_TEST_REDIS_MEM_LIMIT:-64m}
-    cpus: 0.25
-    environment:
-      TZ: Europe/Rome
-    # No persistence and no host port: the test cache is disposable.
-    command:
-      - redis-server
-      - --save
-      - ""
-      - --appendonly
-      - "no"
-      - --maxmemory
-      - 64mb
-      - --maxmemory-policy
-      - allkeys-lru
-    tmpfs:
-      - /data
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
-    networks:
-      - sakura-local-test
-
   sakura-test-runner:
     build:
       context: ./sakura-bot
@@ -84,8 +54,6 @@ services:
     cpus: 1.0
     depends_on:
       sakura-postgres-test:
-        condition: service_healthy
-      sakura-redis-test:
         condition: service_healthy
     environment:
       TZ: Europe/Rome
@@ -98,14 +66,12 @@ services:
       # placeholder before importing any project module. It is kept distinct
       # from the test target so the guard can tell the two apart.
       SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://sakura_local:${SAKURA_TEST_POSTGRES_PASSWORD:-sakura_local_test_pw}@sakura-postgres-test:5432/sakura_local
-      SAKURA_BOT_REDIS_URL: redis://sakura-redis-test:6379/15
       # Fake credentials: they are never used for a real login.
       SAKURA_BOT_DISCORD_TOKEN: ${SAKURA_BOT_DISCORD_TOKEN:-local-test-fake-discord-token}
       SAKURA_BOT_DISCORD_CLIENT_ID: ${SAKURA_BOT_DISCORD_CLIENT_ID:-123456789012345678}
       SAKURA_BOT_OPENAI_API_KEY: ${SAKURA_BOT_OPENAI_API_KEY:-local-test-fake-openai-key}
       SAKURA_BOT_ENVIRONMENT: test
       SAKURA_BOT_LOG_LEVEL: WARNING
-      SAKURA_BOT_CACHE_REQUIRED: "false"
       SAKURA_BOT_HEALTH_SERVER_ENABLED: "false"
       SAKURA_BOT_STRICT_STARTUP: "false"
       # Root of the clone for the tests that assert the repository-level files

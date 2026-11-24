@@ -10,7 +10,7 @@ command) senza toccare Discord, OpenAI o i dati di produzione.
 |---|---|
 | Avvia Spacebar (gateway, API, CDN, PostgreSQL 18, RabbitMQ) su `127.0.0.1` | Non pubblica nulla sulla LAN |
 | Avvia il bot con `SAKURA_BOT_PLATFORM=spacebar` sullo **stesso codice** di produzione | Non avvia lo stack di produzione |
-| Usa PostgreSQL e Redis beta dedicati, con volumi propri | Non monta `.env`, volumi o reti di produzione |
+| Usa PostgreSQL beta dedicato, con volumi propri | Non monta `.env`, volumi o reti di produzione |
 | Punta l'SDK OpenAI a un mock locale deterministico | Non effettua chiamate pagate a OpenAI |
 | Blocca l'egress del bot verso `discord.com`, `gateway.discord.gg`, `api.openai.com` | Non sostituisce il test su Discord reale (staging) |
 

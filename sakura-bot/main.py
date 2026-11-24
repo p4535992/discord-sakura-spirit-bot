@@ -4,7 +4,6 @@ Main entry point for Sakura Spirit Bot
 import asyncio
 import logging
 import sys
-from pathlib import Path
 
 import colorlog
 
@@ -15,40 +14,34 @@ from core.platform import PlatformConfigurationError, apply_platform_overrides
 
 
 def setup_logging():
-    """Configure logging with colors"""
-    # Create the directory that owns the configured log file.
-    log_dir = Path(settings.log_file).parent
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Console handler with colors
-    console_handler = colorlog.StreamHandler()
-    console_handler.setFormatter(
-        colorlog.ColoredFormatter(
-            "%(log_color)s%(levelname)-8s%(reset)s %(blue)s%(name)s%(reset)s %(message)s",
-            log_colors={
-                'DEBUG': 'cyan',
-                'INFO': 'green',
-                'WARNING': 'yellow',
-                'ERROR': 'red',
-                'CRITICAL': 'red,bg_white',
-            }
-        )
-    )
-    
-    # File handler
-    file_handler = logging.FileHandler(settings.log_file, encoding='utf-8')
-    file_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
-        )
-    )
-    
-    # Root logger configuration
+    """Configure logging on stdout/stderr only.
+
+    Docker captures the stream and rotates it with the ``json-file`` driver
+    (``max-size``/``max-file`` in the Compose files), so the application keeps no
+    log file, no log volume and no logrotate sidecar. The handler is added once:
+    a second call (tests, restart in the same interpreter) must not duplicate
+    every line.
+    """
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, settings.log_level.upper()))
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
+
+    if not any(getattr(handler, "_sakura_console", False) for handler in root_logger.handlers):
+        console_handler = colorlog.StreamHandler()
+        console_handler.setFormatter(
+            colorlog.ColoredFormatter(
+                "%(log_color)s%(levelname)-8s%(reset)s %(blue)s%(name)s%(reset)s %(message)s",
+                log_colors={
+                    'DEBUG': 'cyan',
+                    'INFO': 'green',
+                    'WARNING': 'yellow',
+                    'ERROR': 'red',
+                    'CRITICAL': 'red,bg_white',
+                }
+            )
+        )
+        # Marker used by the guard above to recognise its own handler.
+        console_handler._sakura_console = True
+        root_logger.addHandler(console_handler)
     
     # Reduce discord.py logging noise
     logging.getLogger("discord").setLevel(logging.WARNING)

@@ -9,8 +9,15 @@ from typing import Optional
 
 from utils.embed_builder import SakuraEmbed
 from core.database import get_db_session
+from core.lfg_repository import (
+    JOIN_EXPIRED,
+    JOIN_OK,
+    acquire_ritual_cooldown,
+    create_session,
+    expire_session,
+    join_session,
+)
 from core.services import UserService
-from core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -78,21 +85,26 @@ class GamingCommands(commands.Cog):
             message_obj = await interaction.original_response()
             await message_obj.add_reaction("✅")
             
-            # Store LFG data in cache
-            lfg_data = {
-                "creator_id": interaction.user.id,
-                "game": game,
-                "party_size": party_size,
-                "members": [interaction.user.id],
-                "message_id": message_obj.id,
-                "channel_id": interaction.channel.id
-            }
-            
-            await cache.set_json(
-                f"lfg:{interaction.guild.id}:{message_obj.id}",
-                lfg_data,
-                expire=3600  # 1 hour
-            )
+            # Store the session in PostgreSQL: a group must survive a restart.
+            # The message already exists, so a persistence failure is logged
+            # instead of leaving the user without any answer.
+            try:
+                await create_session(
+                    session,
+                    guild_id=interaction.guild.id,
+                    message_id=message_obj.id,
+                    channel_id=interaction.channel.id,
+                    creator_id=interaction.user.id,
+                    game=game,
+                    party_size=party_size,
+                )
+                await session.commit()
+            except Exception:
+                # Leave the session usable for the context manager's own commit.
+                await session.rollback()
+                logger.exception(
+                    "Failed to persist the LFG session of message %s", message_obj.id
+                )
     
     @app_commands.command(name="sakura-ritual-buff", description="Perform a pre-game ritual for buffs")
     @app_commands.describe(ritual_type="Type of ritual to perform")
@@ -111,9 +123,13 @@ class GamingCommands(commands.Cog):
                 interaction.user.name
             )
             
-            # Check cooldown
-            cooldown_key = f"ritual_cooldown:{interaction.user.id}"
-            if await cache.exists(cooldown_key):
+            # Cooldown in PostgreSQL: a restart cannot reset the 30 minutes.
+            # It is acquired before the answer is sent, so two simultaneous
+            # invocations cannot both succeed; a failed send keeps the cooldown
+            # because the ritual was already granted server-side.
+            acquired = await acquire_ritual_cooldown(session, interaction.user.id)
+            await session.commit()
+            if not acquired:
                 embed = SakuraEmbed.error("You've already performed a ritual recently! Wait before trying again.")
                 await interaction.followup.send(embed=embed, ephemeral=True)
                 return
@@ -162,9 +178,6 @@ class GamingCommands(commands.Cog):
             embed.set_footer(text="May the spirits guide your gameplay! 🌸")
             
             await interaction.followup.send(embed=embed)
-            
-            # Set cooldown (30 minutes)
-            await cache.set(cooldown_key, "1", expire=1800)
     
     @app_commands.command(name="sakura-game-stats", description="View your gaming statistics")
     async def game_stats(self, interaction: discord.Interaction):
@@ -237,30 +250,27 @@ class GamingCommands(commands.Cog):
         if payload.member is None or payload.member.bot:
             return
         
-        # Check if this is an LFG message
-        lfg_key = f"lfg:{payload.guild_id}:{payload.message_id}"
-        lfg_data = await cache.get_json(lfg_key)
-        
-        if not lfg_data:
+        # The session lives in PostgreSQL: the join, the duplicate check and the
+        # capacity check happen atomically inside the transaction, then the
+        # message is edited after the commit (no network call while a row lock
+        # is held).
+        async with get_db_session() as session:
+            outcome, lfg, member_ids = await join_session(
+                session,
+                guild_id=payload.guild_id,
+                message_id=payload.message_id,
+                discord_user_id=payload.user_id,
+            )
+            if outcome == JOIN_EXPIRED and lfg is not None:
+                await expire_session(session, lfg)
+            await session.commit()
+
+        if outcome != JOIN_OK or lfg is None:
             return
-        
-        # Check if user is already in the group
-        if payload.user_id in lfg_data["members"]:
-            return
-        
-        # Check if group is full
-        if len(lfg_data["members"]) >= lfg_data["party_size"]:
-            return
-        
-        # Add user to group
-        lfg_data["members"].append(payload.user_id)
-        
-        # Update cache
-        await cache.set_json(lfg_key, lfg_data, expire=3600)
         
         # Update message
         try:
-            channel = self.bot.get_channel(payload.channel_id)
+            channel = self.bot.get_channel(lfg.channel_id)
             if channel is None:
                 logger.warning(
                     "LFG reaction ignored: channel %s is not cached", payload.channel_id
@@ -281,12 +291,12 @@ class GamingCommands(commands.Cog):
             embed.set_field_at(
                 0,
                 name="👥 Party Size",
-                value=f"{len(lfg_data['members'])}/{lfg_data['party_size']}",
+                value=f"{len(member_ids)}/{lfg.party_size}",
                 inline=True
             )
             
             # Update members list
-            members_text = "\n".join([f"• <@{uid}>" for uid in lfg_data["members"]])
+            members_text = "\n".join([f"• <@{uid}>" for uid in member_ids])
             embed.set_field_at(
                 3,
                 name="✅ Joined Players",
@@ -295,7 +305,7 @@ class GamingCommands(commands.Cog):
             )
             
             # Check if full
-            if len(lfg_data["members"]) >= lfg_data["party_size"]:
+            if len(member_ids) >= lfg.party_size:
                 embed.set_field_at(
                     2,
                     name="📍 Status",

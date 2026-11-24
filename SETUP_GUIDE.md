@@ -40,11 +40,13 @@ Before you begin, ensure you have the following installed on your system:
 
 **Python 3.11 or higher**: The bot is built with Python and requires version 3.11+. You can download it from [python.org](https://www.python.org/downloads/).
 
-**PostgreSQL 14+**: A relational database for persistent storage. Download from [postgresql.org](https://www.postgresql.org/download/).
-
-**Redis 6+**: An in-memory data store for caching and real-time data. Download from [redis.io](https://redis.io/download/).
+**PostgreSQL 14+**: A relational database for persistent storage, including LFG
+sessions and ritual cooldowns. Download from
+[postgresql.org](https://www.postgresql.org/download/).
 
 **Git**: For cloning the repository. Download from [git-scm.com](https://git-scm.com/downloads).
+
+No Redis is needed: the cache lives inside the bot process.
 
 ### Required Accounts
 
@@ -128,7 +130,8 @@ Install all required Python packages:
 pip install -r sakura-bot/requirements.txt
 ```
 
-This will install discord.py, SQLAlchemy, OpenAI client, Redis client, and other dependencies.
+This will install discord.py, SQLAlchemy, the OpenAI client and the other
+dependencies. No Redis client is installed: the cache is in-process.
 
 ### Step 4: Set Up PostgreSQL
 
@@ -149,27 +152,11 @@ GRANT ALL PRIVILEGES ON DATABASE sakura_bot TO sakura_user;
 \\q
 ```
 
-### Step 5: Set Up Redis
+### Step 5: Nothing Else to Start
 
-Start Redis server:
-
-```bash
-# On Linux
-sudo systemctl start redis
-
-# On Mac
-brew services start redis
-
-# On Windows
-redis-server
-```
-
-Verify Redis is running:
-
-```bash
-redis-cli ping
-# Should respond with: PONG
-```
+The cache is in-process and LFG sessions and ritual cooldowns are tables in the
+PostgreSQL database created above, so there is no Redis server, no proxy and no
+log-rotation service to install or start.
 
 ## Configuration
 
@@ -194,12 +181,10 @@ SAKURA_BOT_OWNER_ID=your_discord_user_id
 SAKURA_BOT_OPENAI_API_KEY=your_openai_api_key
 SAKURA_BOT_ENVIRONMENT=development
 SAKURA_BOT_LOG_LEVEL=INFO
-SAKURA_BOT_LOG_FILE=logs/sakura_bot.log
 
 # Bot URLs: docker compose builds them for the container, set them only when
 # running main.py directly on the host.
 SAKURA_BOT_DATABASE_URL=postgresql+asyncpg://sakura_user:your_secure_password@localhost:5432/sakura_bot
-SAKURA_BOT_REDIS_URL=redis://localhost:6379/0
 
 # Feature Flags (all enabled by default)
 SAKURA_BOT_ENABLE_SPIRITS=true
@@ -221,11 +206,11 @@ To get your Discord user ID:
 
 ## First Run
 
-### Step 1: Logs Directory
+### Step 1: No Log Directory Needed
 
-The bot creates the parent directory of `SAKURA_BOT_LOG_FILE` at startup, so no
-manual step is needed. With the default value the log file is
-`logs/sakura_bot.log`, relative to the working directory.
+The bot writes to stdout/stderr: there is no log file and no directory to
+create. Under Docker the output is captured by `docker compose logs`; on a host
+run it appears in the terminal (or in the journal when started by systemd).
 
 ### Step 2: Start the Bot
 
@@ -240,7 +225,7 @@ You should see output similar to:
 🌸 Starting Sakura Spirit Bot 🌸
 ============================================================
 INFO     core.database Database connection established
-INFO     core.cache Redis connection established
+INFO     core.cache Local TTL cache initialised (max 2048 entries)
 INFO     core.bot Loaded extension: commands.spirit_commands
 INFO     core.bot Loaded extension: commands.weather_commands
 ...
@@ -365,8 +350,8 @@ You can customize bot behavior by editing the `core/config.py` file. Key setting
 
 **Solutions**:
 - Verify all environment variables in `.env` are correct
-- Check that PostgreSQL and Redis are running
-- Review logs in `logs/sakura_bot.log` for error messages
+- Check that PostgreSQL is running
+- Review the console output (or `docker compose logs sakura-bot`) for error messages
 - Ensure Python version is 3.11 or higher
 
 ### Database Connection Error
@@ -379,14 +364,17 @@ You can customize bot behavior by editing the `core/config.py` file. Key setting
 - Check `SAKURA_BOT_DATABASE_URL` format in `.env`
 - Ensure database exists and user has proper permissions
 
-### Redis Connection Error
+### LFG or Ritual Cooldown Look Stuck
 
-**Problem**: "Failed to connect to Redis" error.
+**Problem**: an LFG post no longer accepts joins, or a ritual is refused.
 
 **Solutions**:
-- Verify Redis is running: `redis-cli ping`
-- Check `SAKURA_BOT_REDIS_URL` in `.env`
-- Ensure Redis is accepting connections on port 6379
+- Both are rows in PostgreSQL (`lfg_sessions`, `lfg_members`,
+  `ritual_cooldowns`): a restart does not clear them
+- An LFG post expires after one hour and every accepted join renews the window;
+  a full group rejects new members
+- The ritual cooldown lasts 30 minutes per user, across all guilds
+- Inspect the rows with `psql` before changing anything
 
 ### Commands Not Appearing
 

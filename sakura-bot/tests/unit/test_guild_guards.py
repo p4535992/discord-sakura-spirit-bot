@@ -1,13 +1,17 @@
 """Guild-dependent commands and raw events must fail safely.
 
-Everything is mocked: no Discord connection, no database and no Redis server is
-contacted. The callbacks are invoked through ``Command.callback``.
+Everything is mocked: no Discord connection and no PostgreSQL server is
+contacted. The callbacks are invoked through ``Command.callback``; the LFG
+reaction test uses the in-memory SQLite session factory of ``conftest``.
 """
+
+from contextlib import asynccontextmanager
 
 import commands.gaming_commands as gaming_commands
 import commands.spirit_commands as spirit_commands
 from commands.gaming_commands import GamingCommands
 from commands.spirit_commands import SpiritCommands
+from core.lfg_repository import create_session, get_session, list_member_ids
 
 SERVER_ONLY_MESSAGE = "This command can only be used in a server!"
 
@@ -63,22 +67,6 @@ class FakePayload:
         self.emoji = FakeEmoji()
 
 
-class FakeCache:
-    """Record the keys read and written by the raw reaction handler."""
-
-    def __init__(self, payload=None):
-        self.payload = payload
-        self.reads = []
-        self.writes = []
-
-    async def get_json(self, key):
-        self.reads.append(key)
-        return self.payload
-
-    async def set_json(self, key, value, expire=None):
-        self.writes.append((key, value))
-
-
 class FakeBot:
     def __init__(self, channel=None):
         self._channel = channel
@@ -88,7 +76,18 @@ class FakeBot:
 
 
 def _unexpected_session():
-    raise AssertionError("the database must not be opened in a direct message")
+    raise AssertionError("the database must not be opened for an ignored reaction")
+
+
+def _session_provider(factory):
+    """Return a ``get_db_session`` replacement bound to the test database."""
+
+    @asynccontextmanager
+    async def _provider():
+        async with factory() as session:
+            yield session
+
+    return _provider
 
 
 async def test_spirit_interact_rejects_a_direct_message(monkeypatch):
@@ -111,41 +110,48 @@ async def test_lfg_rejects_a_direct_message(monkeypatch):
 
 
 async def test_raw_reaction_without_a_member_is_ignored(monkeypatch):
-    cache = FakeCache(payload={"members": [], "party_size": 5})
-    monkeypatch.setattr(gaming_commands, "cache", cache)
+    monkeypatch.setattr(gaming_commands, "get_db_session", _unexpected_session)
 
     await GamingCommands(FakeBot()).on_raw_reaction_add(FakePayload(member=None))
 
-    assert cache.reads == []
-
 
 async def test_raw_reaction_outside_a_guild_is_ignored(monkeypatch):
-    cache = FakeCache(payload={"members": [], "party_size": 5})
-    monkeypatch.setattr(gaming_commands, "cache", cache)
+    monkeypatch.setattr(gaming_commands, "get_db_session", _unexpected_session)
 
     await GamingCommands(FakeBot()).on_raw_reaction_add(
         FakePayload(guild_id=None, member=FakeMember())
     )
 
-    assert cache.reads == []
-
 
 async def test_raw_reaction_from_a_bot_is_ignored(monkeypatch):
-    cache = FakeCache(payload={"members": [], "party_size": 5})
-    monkeypatch.setattr(gaming_commands, "cache", cache)
+    monkeypatch.setattr(gaming_commands, "get_db_session", _unexpected_session)
 
     await GamingCommands(FakeBot()).on_raw_reaction_add(FakePayload(member=FakeMember(bot=True)))
 
-    assert cache.reads == []
 
+async def test_raw_reaction_in_an_unknown_channel_is_ignored(monkeypatch, sqlite_session_factory):
+    async with sqlite_session_factory() as session:
+        await create_session(
+            session,
+            guild_id=1,
+            message_id=3,
+            channel_id=2,
+            creator_id=4,
+            game="Valorant",
+            party_size=5,
+        )
+        await session.commit()
 
-async def test_raw_reaction_in_an_unknown_channel_is_ignored(monkeypatch):
-    cache = FakeCache(payload={"members": [], "party_size": 5})
-    monkeypatch.setattr(gaming_commands, "cache", cache)
-
-    await GamingCommands(FakeBot(channel=None)).on_raw_reaction_add(
-        FakePayload(member=FakeMember())
+    monkeypatch.setattr(
+        gaming_commands, "get_db_session", _session_provider(sqlite_session_factory)
     )
 
-    # The member is recorded, but the missing channel must not raise.
-    assert cache.writes
+    await GamingCommands(FakeBot(channel=None)).on_raw_reaction_add(
+        FakePayload(guild_id=1, channel_id=2, message_id=3, user_id=99, member=FakeMember())
+    )
+
+    # The join is persisted before the message is edited, and the missing
+    # channel must not raise.
+    async with sqlite_session_factory() as session:
+        lfg = await get_session(session, guild_id=1, message_id=3)
+        assert await list_member_ids(session, lfg) == [4, 99]

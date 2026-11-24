@@ -3,9 +3,14 @@ HTTP probes used by container orchestration.
 
 ``/health`` reports process liveness, ``/ready`` reports whether the bot can
 serve traffic: the Discord gateway must be connected, the bootstrap must be
-complete, the database must answer a trivial query, Redis must answer a ``PING``
-when ``SAKURA_BOT_CACHE_REQUIRED`` is true and every required extension must be
-loaded. No configuration value, credential or user data is exposed.
+complete, the database must answer a trivial query, the in-process cache must be
+initialised and every required extension must be loaded. No configuration value,
+credential or user data is exposed.
+
+``checks.cache`` describes the local TTL cache of ``core/cache.py``, not a remote
+service. It is kept in the payload for the clients that already read it, but it
+never replaces ``checks.database``: only the database query proves that the
+persistent state (users, servers, LFG sessions, cooldowns) is reachable.
 """
 
 import logging
@@ -20,7 +25,6 @@ from core.database import db
 logger = logging.getLogger(__name__)
 
 READY_STATUS = "ready"
-DEGRADED_STATUS = "degraded"
 NOT_READY_STATUS = "not_ready"
 
 
@@ -79,7 +83,7 @@ class HealthServer:
     async def handle_ready(self, request: web.Request) -> web.Response:
         """Readiness: HTTP 200 only when the bot can actually serve traffic."""
         payload = await self.collect_readiness()
-        status = 200 if payload["status"] in (READY_STATUS, DEGRADED_STATUS) else 503
+        status = 200 if payload["status"] == READY_STATUS else 503
         return web.json_response(payload, status=status)
 
     async def collect_readiness(self) -> dict[str, Any]:
@@ -88,20 +92,16 @@ class HealthServer:
         database_ready = await db.ping()
         cache_ready = await cache.ping()
         extensions_ready = not self.startup_failures
-        cache_acceptable = cache_ready or not settings.cache_required
 
         ready = (
             discord_ready
             and database_ready
             and extensions_ready
-            and cache_acceptable
+            and cache_ready
             and self.bootstrap_complete
             and not self.shutting_down
         )
-        if ready:
-            status = READY_STATUS if cache_ready else DEGRADED_STATUS
-        else:
-            status = NOT_READY_STATUS
+        status = READY_STATUS if ready else NOT_READY_STATUS
 
         payload: dict[str, Any] = {
             "status": status,

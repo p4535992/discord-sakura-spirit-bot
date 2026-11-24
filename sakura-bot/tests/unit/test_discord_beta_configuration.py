@@ -72,8 +72,9 @@ def test_beta_compose_uses_its_own_project_name():
     assert "name: sakura-spirit-bot-discord-beta" in text
 
 
-def test_beta_compose_declares_the_three_beta_services():
-    assert set(_services()) == {"beta-postgres", "beta-redis", "beta-bot"}
+def test_beta_compose_declares_the_two_beta_services():
+    """The cache is in-process: the beta stack runs the bot and its database."""
+    assert set(_services()) == {"beta-postgres", "beta-bot"}
 
 
 def test_beta_compose_avoids_container_names_and_published_ports():
@@ -100,9 +101,8 @@ def test_only_the_bot_joins_the_egress_network():
 
     assert "- beta-private" in services["beta-bot"]
     assert "- beta-egress" in services["beta-bot"]
-    for name in ("beta-postgres", "beta-redis"):
-        assert "- beta-private" in services[name]
-        assert "beta-egress" not in services[name]
+    assert "- beta-private" in services["beta-postgres"]
+    assert "beta-egress" not in services["beta-postgres"]
 
 
 def test_private_network_is_internal():

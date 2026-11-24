@@ -5,6 +5,7 @@ from .base import Base
 from .user import User, UserStats, UserSpirit, UserInventory, EmotionalHistory, DailyDream
 from .server import Server, WeatherHistory, FactionScore, Relationship
 from .spirit import Spirit, SpiritInteraction, SpiritRoaming
+from .gaming import LfgSession, LfgMember, RitualCooldown
 from .world import (
     WorldEvent, CodexEntry, ParkZone, NPC, UserZoneProgress,
     Shop, Quest, UserQuest
@@ -25,6 +26,9 @@ __all__ = [
     "Spirit",
     "SpiritInteraction",
     "SpiritRoaming",
+    "LfgSession",
+    "LfgMember",
+    "RitualCooldown",
     "WorldEvent",
     "CodexEntry",
     "ParkZone",

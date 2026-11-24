@@ -1,5 +1,10 @@
 # sakura-redis
 
+> **Historical material.** This container is no longer part of any active Compose
+> file: the cache is in-process (`sakura-bot/core/cache.py`) and LFG sessions and
+> ritual cooldowns live in PostgreSQL. The folder is kept only for rollback and
+> for the operator to decide when to remove it.
+
 Redis container (`sakura-redis`), image `redis:${SAKURA_REDIS_VERSION}`.
 
 - `config/redis.conf`: no persistence (`save ""`, `appendonly no`), listens on

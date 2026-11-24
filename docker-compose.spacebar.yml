@@ -4,6 +4,9 @@
 # stacks: own project name, own networks, own volumes, own credentials. The bot
 # in this stack never talks to discord.com or api.openai.com.
 #
+# RabbitMQ belongs to Spacebar and stays. Sakura no longer runs Redis: the cache
+# is in-process and LFG sessions/ritual cooldowns live in sakura-postgres-beta.
+#
 # Images are pinned by digest because Spacebar publishes only the mutable
 # `latest` tag. Digests were resolved on 2026-11-23 from
 # `docker image inspect --format '{{index .RepoDigests 0}}'`.
@@ -157,35 +160,6 @@ services:
     networks:
       - spacebar-backend
 
-  sakura-redis-beta:
-    image: redis:7-alpine
-    restart: "no"
-    mem_limit: ${SAKURA_BETA_REDIS_MEM_LIMIT:-96m}
-    environment:
-      TZ: Europe/Rome
-    command:
-      - redis-server
-      - --save
-      - ""
-      - --appendonly
-      - "no"
-      - --maxmemory
-      - 96mb
-      - --maxmemory-policy
-      - allkeys-lru
-    tmpfs:
-      - /data
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
-    networks:
-      - spacebar-backend
-
   # ------------------------------------------------------------- AI test stub
   ai-mock:
     build:
@@ -233,8 +207,6 @@ services:
       SAKURA_BOT_GATEWAY_URL: ws://spacebar-gateway:3001
       SAKURA_BOT_ASSET_BASE_URL: http://spacebar-cdn:3001
       SAKURA_BOT_DATABASE_URL: postgresql+asyncpg://sakura_beta:${SAKURA_BETA_DB_PASSWORD:?set-a-local-beta-db-password}@sakura-postgres-beta:5432/sakura_beta
-      SAKURA_BOT_REDIS_URL: redis://sakura-redis-beta:6379/0
-      SAKURA_BOT_CACHE_REQUIRED: "true"
       # Sentinel key: the SDK is pointed at the local stub, which has no egress.
       SAKURA_BOT_OPENAI_API_KEY: local-mock-key
       SAKURA_BOT_OPENAI_BASE_URL: http://ai-mock:8081/v1
@@ -247,8 +219,6 @@ services:
     depends_on:
       sakura-postgres-beta:
         condition: service_healthy
-      sakura-redis-beta:
-        condition: service_healthy
       ai-mock:
         condition: service_healthy
       spacebar-api:
@@ -257,6 +227,13 @@ services:
         condition: service_started
     security_opt:
       - no-new-privileges:true
+    # Logs go to stdout/stderr; Docker rotates the json-file output. Spacebar
+    # services are pinned images and keep their own logging configuration.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10M"
+        max-file: "3"
     networks:
       # Backend only: no route to the Internet, so discord.com and api.openai.com
       # are unreachable even if a configuration mistake pointed at them.

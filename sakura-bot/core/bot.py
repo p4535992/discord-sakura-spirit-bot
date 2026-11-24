@@ -71,7 +71,9 @@ class SakuraSpiritBot(commands.Bot):
         """Called when the bot is starting up"""
         logger.info("Setting up Sakura Spirit Bot...")
         
-        # Initialize database and cache before any extension uses them.
+        # Initialize the database and the in-process cache before any extension
+        # uses them: the cache holds only rebuildable data, the database holds
+        # the state that must survive a restart.
         await init_database()
         await init_cache()
         # The readiness probe needs the client instance to report the gateway

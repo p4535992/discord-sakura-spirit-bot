@@ -35,8 +35,7 @@ the run. The dedicated cluster comes from `../docker-compose.test.yml`.
 - Configuration: environment variables only, all prefixed `SAKURA_BOT_`
   (see `../.env.example`). For a host run the settings object also reads
   `../.env`, so the root file works without copying it into this folder.
-- Logs: the named volume `sakura-bot-logs` is mounted on `/var/log/sakura-bot`
-  and rotated by the `sakura-proxy-logrotate` sidecar.
-- The image runs unprivileged (UID 10001) and creates `/var/log/sakura-bot` with
-  that owner, so a fresh named volume inherits the correct permissions without
-  any host-side `chown`.
+- Logs: the application writes to stdout/stderr and Docker rotates the
+  `json-file` output (`max-size`/`max-file` in the Compose file). There is no log
+  volume, no log file and no logrotate sidecar.
+- The image runs unprivileged (UID 10001).

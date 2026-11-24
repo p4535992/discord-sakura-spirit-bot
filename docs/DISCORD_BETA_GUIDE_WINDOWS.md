@@ -33,7 +33,7 @@ question is "does it look and behave correctly on Discord", use level 2.
 |---|---|
 | Starts the bot with `SAKURA_BOT_ENVIRONMENT=discord-beta` on the **same code** as production | Does not start, stop or reconfigure the production stack |
 | Uses a separate Discord application (own token, client ID and guild) | Does not reuse the production token or client ID |
-| Uses dedicated beta PostgreSQL and Redis, with their own volumes and networks | Does not mount production `.env`, volumes or networks |
+| Uses a dedicated beta PostgreSQL, with its own volume and network | Does not mount production `.env`, volumes or networks |
 | Registers the 25 slash commands **only** on the test guild | Does not publish the commands globally |
 | Answers through the deterministic `stub` AI provider, with no network | Does not call OpenAI by default |
 | Requires Internet: it talks to `discord.com` and to the real Gateway | Does not simulate Discord (the Spacebar beta exists for that) |
@@ -49,13 +49,13 @@ The beta bot **publishes no port**: the Gateway connection is outbound and the
 - Stable Internet connection: without it the bot cannot reach Discord.
 - A Discord account with access to the Discord Developer Portal.
 - Little disk space: the images are the ones production already uses
-  (`python:3.13-slim`, `postgres`, `redis`), about 1 GB in total.
+  (`python:3.13-slim`, `postgres`), about 700 MB in total.
 
 ## Files involved
 
 | File | Role |
 |---|---|
-| `docker-compose.discord-beta.yml` | Beta stack: `beta-bot`, `beta-postgres`, `beta-redis` |
+| `docker-compose.discord-beta.yml` | Beta stack: `beta-bot`, `beta-postgres` |
 | `.env.discord-beta.example` | Versioned template with the placeholders |
 | `.env.discord-beta` | Real local configuration (**ignored by Git**) |
 | `sakura-bot/tests/unit/test_discord_beta_configuration.py` | Tests that block isolation and sync regressions |
@@ -204,7 +204,7 @@ fake credentials.
 # Start ONLY the Discord beta.
 docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml up -d --build
 
-# Status of the three beta services.
+# Status of the two beta services.
 docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml ps
 
 # Beta bot log.
@@ -243,7 +243,7 @@ Expected answer, HTTP 200:
 - `/health` (HTTP 200) only proves the process is alive: it does **not** prove
   that Discord is connected.
 - `/ready` requires a connected Gateway, a completed bootstrap, a reachable
-  PostgreSQL, a Redis answering `PING` and every required extension loaded. HTTP
+  PostgreSQL, an initialised local cache and every required extension loaded. HTTP
   503 with a `false` check tells which part is missing.
 - In the Discord client the `sakura-*` commands must appear **in the test guild
   only**. If they appear in other guilds the sync went global: stop the beta
@@ -266,7 +266,7 @@ are the ones verified by `sakura-bot/tests/smoke/test_command_registry.py`.
 | AI stub | `/sakura-spirit-interact` | Deterministic answer, no network log | TO RUN |
 | Social | `/sakura-daily-dream` | Dream embed, row in `daily_dreams` | TO RUN |
 | Social | `/sakura-send-gift` | Correct defer/followup, currency moved | TO RUN |
-| Gaming | `/sakura-lfg` | Session in beta Redis, reactions handled | TO RUN |
+| Gaming | `/sakura-lfg` | Session row in beta PostgreSQL, reactions handled | TO RUN |
 | Permissions | `/sakura-admin-stats` | Denied to a non-admin user | TO RUN |
 | Permissions | `/sakura-admin-set-weather` | Allowed to an admin user | TO RUN |
 | Errors | Wrong parameters | Error message, no unhandled exception | TO RUN |
@@ -317,7 +317,7 @@ docker compose --env-file .env.discord-beta -f docker-compose.discord-beta.yml d
 | Commands do not appear in the guild | Sync went to another guild, or a stale client cache | Check `SAKURA_BETA_TEST_GUILD_ID`, restart the bot, reopen the client |
 | Commands appear in other guilds | The sync went global | Stop the beta and check `SAKURA_BOT_ENVIRONMENT` and `SAKURA_BOT_TEST_GUILD_ID` |
 | `/ready` returns 503 with `database: false` | Beta PostgreSQL not ready or wrong password | Check `ps` and the `beta-postgres` log |
-| `/ready` returns 503 with `cache: false` | Beta Redis unreachable | Check the `beta-redis` state |
+| `/ready` returns 503 with `cache: false` | The in-process cache was not initialised (bootstrap failure) | Check the `beta-bot` log for the bootstrap error |
 | `/ready` returns 503 with `discord: false` | Gateway not connected (no network, wrong token) | Check connectivity and the bot log |
 | `password authentication failed` on PostgreSQL | Password with special characters not encoded in the URL | Use an alphanumeric password and recreate the beta volume |
 

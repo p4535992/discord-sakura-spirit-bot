@@ -40,7 +40,6 @@ REQUIRED_ENV = {
     "SAKURA_BOT_DISCORD_TOKEN": "test-token",
     "SAKURA_BOT_DISCORD_CLIENT_ID": "123456789012345678",
     "SAKURA_BOT_DATABASE_URL": "postgresql+asyncpg://user:password@localhost:5432/sakura_bot",
-    "SAKURA_BOT_REDIS_URL": "redis://localhost:6379/0",
     "SAKURA_BOT_OPENAI_API_KEY": "test-openai-key",
 }
 
@@ -97,7 +96,6 @@ def spacebar_settings(monkeypatch):
         "DISCORD_TOKEN",
         "DISCORD_CLIENT_ID",
         "DATABASE_URL",
-        "REDIS_URL",
         "OPENAI_API_KEY",
     ):
         monkeypatch.delenv(name, raising=False)

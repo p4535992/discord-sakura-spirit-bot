@@ -1,5 +1,10 @@
 # sakura-proxy
 
+> **Historical material.** This container is no longer part of any active Compose
+> file: the bot connects outbound to the Discord Gateway, so no inbound proxy is
+> needed and the probes are read with `docker compose exec`. The folder is kept
+> only for rollback and for the operator to decide when to remove it.
+
 Traefik container (`sakura-proxy`), image
 `traefik:${SAKURA_PROXY_TRAEFIK_VERSION}`.
 

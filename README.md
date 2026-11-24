@@ -39,8 +39,7 @@ Replace every `CHANGE_ME` value in `.env`: `SAKURA_BOT_DISCORD_TOKEN`,
 `SAKURA_BOT_DISCORD_CLIENT_ID`, `SAKURA_BOT_OPENAI_API_KEY` and
 `SAKURA_POSTGRES_PASSWORD`. `SAKURA_BOT_OWNER_ID` is optional. Every key is
 prefixed with the container that reads it (`SAKURA_BOT_*`,
-`SAKURA_POSTGRES_*`, `SAKURA_REDIS_*`, `SAKURA_PROXY_*`,
-`SAKURA_PROXY_LOGROTATE_*`), so the file stays grouped by service.
+`SAKURA_POSTGRES_*`), so the file stays grouped by service.
 The password must be alphanumeric because it is embedded in
 `SAKURA_BOT_DATABASE_URL` without escaping.
 
@@ -52,38 +51,43 @@ docker compose ps
 docker compose logs -f sakura-bot
 ```
 
-The stack runs the two application containers and the supporting services the
-code requires:
+The stack runs two containers:
 
 | Container | Role |
 |---|---|
 | `sakura-bot` | The bot itself (Python 3.13, unprivileged user) |
 | `sakura-postgres` | PostgreSQL, data in the `sakura-postgres-data` volume |
-| `sakura-redis` | Redis for LFG sessions and cooldowns |
-| `sakura-proxy` | Traefik on `https://localhost` with a self-signed certificate |
-| `sakura-proxy-logrotate` | Log rotation sidecar for Traefik and bot logs |
 
-Every container keeps its state in a Docker named volume of its own
-(`sakura-postgres-data`, `sakura-bot-logs`, `sakura-proxy-logs`,
-`sakura-proxy-logrotate-state`, `sakura-proxy-logrotate-logs`), so rebuilding an
-image never touches data and no host directory has to be prepared. The
-logrotate sidecar also mounts the bot and Traefik log volumes, because it
-rotates those files in place. `docker compose down` keeps the volumes,
-`docker compose down -v` deletes them.
+The cache is in-process and LFG sessions and ritual cooldowns are stored in
+PostgreSQL, so there is no Redis container. The bot connects **outbound** to the
+Discord Gateway, so no inbound proxy is needed either: there is no Traefik and no
+logrotate sidecar, and the application writes its logs to stdout/stderr.
+
+PostgreSQL keeps its state in the `sakura-postgres-data` Docker named volume, so
+rebuilding an image never touches data and no host directory has to be prepared.
+`docker compose down` keeps the volume, `docker compose down -v` deletes it. The
+former `sakura-bot-logs`, `sakura-proxy-logs` and `sakura-proxy-logrotate-*`
+volumes are no longer declared and are **not** deleted automatically: the old
+files stay available until the operator removes them.
+
+Docker rotates the container logs through the `json-file` driver
+(`max-size: "10M"`, `max-file: "3"`): that is a bound on disk usage, not on the
+memory of the container.
 
 Check the health endpoints:
 
 ```bash
-curl -k https://localhost/health
+docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/health').read().decode())"
 docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
 ```
 
-`/health` reports process liveness and is the only path Traefik publishes, on
-`127.0.0.1` only. `/ready` reports whether the bot can serve traffic (Discord
-gateway connected, bootstrap complete, PostgreSQL reachable, Redis answering
-`PING` when `SAKURA_BOT_CACHE_REQUIRED=true`, required extensions loaded): it
-returns HTTP 503 with the failing checks and stays reachable only inside the
-Docker network, so it is read with `docker compose exec` as shown above.
+`/health` reports process liveness. `/ready` reports whether the bot can serve
+traffic (Discord gateway connected, bootstrap complete, PostgreSQL answering a
+trivial query, local cache initialised, required extensions loaded): it returns
+HTTP 503 with the failing checks. Neither probe is published on the host, so both
+are read with `docker compose exec` as shown above. `checks.cache` describes the
+in-process cache, not a remote service; `checks.database` is the check that
+proves the persistent state is reachable.
 
 ### 4. Run Without Docker (optional)
 
@@ -95,9 +99,10 @@ pip install -r requirements-dev.txt
 python main.py
 ```
 
-With this path, uncomment `SAKURA_BOT_DATABASE_URL` and `SAKURA_BOT_REDIS_URL`
-in the repository root `.env` and point them at reachable services: the settings
-object also reads `../.env`, so the same file serves Compose and a host run.
+With this path, uncomment `SAKURA_BOT_DATABASE_URL` in the repository root `.env`
+and point it at a reachable PostgreSQL: the settings object also reads `../.env`,
+so the same file serves Compose and a host run. No Redis is required: the cache
+lives in the process and the LFG/cooldown state is in the same database.
 
 ### 5. Run the Tests
 
@@ -130,26 +135,28 @@ docker compose -f docker-compose.test.yml down
 
 The host run above skips the PostgreSQL integration test when
 `SAKURA_POSTGRES_TEST_DATABASE_URL` is not set. The isolated stack starts a
-throwaway PostgreSQL and Redis, so the same suite runs complete and nothing is
-skipped:
+throwaway PostgreSQL, so the same suite runs complete and nothing is skipped:
 
 ```bash
 docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml up --build --abort-on-container-exit --exit-code-from sakura-test-runner sakura-test-runner
 docker compose --env-file .env.sakura-local-test -f docker-compose.sakura-local-test.yml down
 ```
 
-Verified result: **156 passed, 0 skipped** in 1.7 s. The integration test
+Result of the host run on this revision: **186 passed, 1 skipped**. The
+integration test
 `tests/integration/test_user_creation_postgres.py::test_user_and_stats_are_persisted`
 runs against the throwaway cluster, after `tests/support/database_guard.py` has
-verified the URL and the marker row; the host run reports 155 passed and 1
-skipped because that variable is absent.
+verified the URL and the marker row; the host run skips it because that variable
+is absent. The isolated stack above runs the same suite with the integration test
+included.
 
 #### Visual check of the running bot
 
 The bot has no graphical interface: its observable surface is the HTTP probe
 server. The screenshot below was captured with Playwright against the local
 Spacebar stack, with the bot connected to the local Spacebar gateway and to its
-own PostgreSQL and Redis.
+own PostgreSQL. It is historical evidence of that run, not of the current
+revision.
 
 ![Risposta di /ready del bot con tutti i controlli verdi](docs/images/spacebar-beta-ready.png)
 
@@ -256,8 +263,9 @@ adapter patches documented in the same file.
 
 `docker-compose.discord-beta.yml` runs the same image against a **separate
 Discord application** and a **private test guild**, with its own PostgreSQL,
-Redis, volumes and networks. Nothing is shared with the production stack, and
-the slash commands are registered on the test guild only.
+volumes and networks. Nothing is shared with the production stack, and the slash
+commands are registered on the test guild only. Two containers
+(`beta-postgres`, `beta-bot`): the cache is in-process, as in production.
 
 ```bash
 cp .env.discord-beta.example .env.discord-beta      # Windows: Copy-Item
@@ -335,13 +343,13 @@ This bot is built with a modular architecture, making it easy to extend and add 
 │   ├── pyproject.toml       # Pytest and black configuration
 │   └── .flake8              # Lint configuration
 ├── sakura-postgres/         # PostgreSQL container notes (env-only configuration)
-├── sakura-redis/            # Redis container: config/redis.conf
-├── sakura-proxy/            # Traefik container: static and dynamic configuration
-├── sakura-proxy-logrotate/  # Log rotation sidecar: Dockerfile, config, scripts
+├── sakura-redis/            # Historical: Redis container, no longer part of the stack
+├── sakura-proxy/            # Historical: Traefik container, no longer part of the stack
+├── sakura-proxy-logrotate/  # Historical: logrotate sidecar, no longer part of the stack
 ├── .env.example             # Environment variable template
 ├── .env.discord-beta.example # Discord beta template (separate app and guild)
-├── docker-compose.yml       # Bot, PostgreSQL, Redis, Traefik, logrotate
-├── docker-compose.discord-beta.yml # Discord beta: separate app, own DB, Redis, volumes
+├── docker-compose.yml       # Bot and PostgreSQL
+├── docker-compose.discord-beta.yml # Discord beta: separate app, own DB and volumes
 ├── docker-compose.test.yml  # Throwaway PostgreSQL for the integration tests
 ├── docker-compose.sakura-local-test.yml # Full suite on throwaway services
 ├── docker-compose.spacebar.yml # Local Spacebar beta stack
@@ -350,13 +358,16 @@ This bot is built with a modular architecture, making it easy to extend and add 
 ```
 
 Each container has its own folder named after it (`sakura-bot/`,
-`sakura-redis/`, ...) holding its `config/`, `scripts/`, `Dockerfile` and a
+`sakura-postgres/`, ...) holding its `config/`, `scripts/`, `Dockerfile` and a
 short `README.md`. Folder name, compose service name, `container_name` and
-environment prefix always match, so `sakura-proxy` is the `sakura-proxy/`
-folder, the `sakura-proxy` service and the `SAKURA_PROXY_*` variables. `sakura-bot/`
-also holds the whole application (sources, tests, requirements and lint
-configuration), so it is the build context of the bot image; the repository root
-keeps only the project-level files (Compose, `.env.example`, documentation).
+environment prefix always match, so `sakura-postgres` is the `sakura-postgres/`
+folder, the `sakura-postgres` service and the `SAKURA_POSTGRES_*` variables.
+`sakura-redis/`, `sakura-proxy/` and `sakura-proxy-logrotate/` are kept only as
+historical material for rollback: no active Compose file references them.
+`sakura-bot/` also holds the whole application (sources, tests, requirements and
+lint configuration), so it is the build context of the bot image; the repository
+root keeps only the project-level files (Compose, `.env.example`,
+documentation).
 
 ## 🤝 Contributing
 

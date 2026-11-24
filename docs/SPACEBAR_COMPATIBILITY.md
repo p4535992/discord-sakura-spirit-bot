@@ -177,7 +177,7 @@ staging, con un'applicazione Discord di test separata:
 
 1. Stesso codice e stessa immagine, `SAKURA_BOT_PLATFORM=discord` (nessun patch).
 2. Token di un'applicazione Discord **diversa** da quella di produzione.
-3. Database, Redis e variabili indipendenti da beta e produzione.
+3. Database e variabili indipendenti da beta e produzione.
 4. Ricontrollare i 25 comandi, i permessi, gli eventi Gateway, le reaction, il
    voice, i messaggi ephemeral e i rate limit.
 5. Promuovere in produzione solo dopo questa verifica, con una check-list

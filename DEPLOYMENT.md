@@ -16,19 +16,20 @@ Before deploying the bot, ensure you have the following:
 2. **PostgreSQL Database**
    - PostgreSQL 14+ recommended
    - Create a database for the bot
+   - Also stores LFG sessions and ritual cooldowns: they are game state and must
+     survive a restart
 
-3. **Redis Server**
-   - Redis 6+ recommended
-   - Used for caching and real-time data
-
-4. **OpenAI API Key**
+3. **OpenAI API Key**
    - Sign up at [OpenAI](https://platform.openai.com/)
    - Create an API key with access to GPT models
 
-5. **Server/VPS**
+4. **Server/VPS**
    - Ubuntu 22.04 LTS recommended
    - Minimum 2GB RAM, 1 CPU core
    - Python 3.11+ installed
+
+No Redis, proxy or log-rotation service is required: the cache is in-process,
+the bot connects outbound to the Discord Gateway and it logs to stdout.
 
 ## Local Development Setup
 
@@ -69,7 +70,6 @@ SAKURA_BOT_OWNER_ID=your_discord_user_id
 # Bot URLs: docker compose builds them for the container, set them only when
 # running main.py directly on the host.
 SAKURA_BOT_DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/sakura_bot
-SAKURA_BOT_REDIS_URL=redis://localhost:6379/0
 ```
 
 ### Step 3: Set Up Database
@@ -112,30 +112,25 @@ docker compose ps
 |---|---|---|---|
 | `sakura-bot` | built from `sakura-bot/Dockerfile` | none | Discord bot; health endpoint on 8080 inside the network |
 | `sakura-postgres` | `postgres:${SAKURA_POSTGRES_VERSION}` | `127.0.0.1:${SAKURA_POSTGRES_PORT}` | Database, volume `sakura-postgres-data` |
-| `sakura-redis` | `redis:${SAKURA_REDIS_VERSION}` | none | LFG sessions and cooldowns |
-| `sakura-proxy` | `traefik:${SAKURA_PROXY_TRAEFIK_VERSION}` | `127.0.0.1:${SAKURA_PROXY_HTTPS_PORT}` | TLS termination for the health endpoint |
-| `sakura-proxy-logrotate` | built from `sakura-proxy-logrotate/Dockerfile` | none | Log rotation for Traefik and bot logs |
 
 Operational notes:
 
-- `SAKURA_BOT_CACHE_REQUIRED=true` is set in `docker-compose.yml`: the bot refuses to
-  start without Redis. Remove the `sakura-redis` service only after switching the
-  variable to `false`, which enables the degraded cache mode reported by
-  `/ready`.
-- Every container writes its state to a named volume (`sakura-postgres-data`,
-  `sakura-bot-logs`, `sakura-proxy-logs`, `sakura-proxy-logrotate-state`,
-  `sakura-proxy-logrotate-logs`). The volumes survive image rebuilds and
-  `docker compose down`; only `docker compose down -v` removes them. The bot
-  image creates `/var/log/sakura-bot` as UID 10001, so a fresh volume inherits
-  the right owner and no host-side `chown` is needed.
-- Traefik has no default certificate configured, so it generates a self-signed one.
-  Replace it with a real certificate before exposing the endpoint.
-- The Traefik dashboard and ping endpoint are bound to the container loopback and
-  are intentionally not published.
-- Traefik routes only `Path(`/health`)`, published on the host loopback. `/ready`
-  is not routed: read it inside the Docker network with
-  `docker compose exec sakura-bot ...` (see the day-to-day commands below).
-- The five `container_name` entries are fixed, so `docker compose -p <other>`
+- Two containers only. The cache is in the bot process (`core/cache.py`) and LFG
+  sessions and ritual cooldowns are rows in PostgreSQL, so no Redis service is
+  started and no cache flag has to be configured.
+- The bot connects **outbound** to the Discord Gateway: there is no inbound
+  proxy, no Traefik and no published HTTPS endpoint. Both probes are read inside
+  the container with `docker compose exec` (see the day-to-day commands below).
+- PostgreSQL writes to the named volume `sakura-postgres-data`. The volume
+  survives image rebuilds and `docker compose down`; only
+  `docker compose down -v` removes it. The former `sakura-bot-logs`,
+  `sakura-proxy-logs` and `sakura-proxy-logrotate-*` volumes are no longer
+  declared: they are not deleted automatically, so the old files stay available
+  until the operator removes them.
+- The application logs to stdout/stderr and Docker rotates the output with the
+  `json-file` driver (`max-size: "10M"`, `max-file: "3"`): a bound on disk usage,
+  not on the memory of the container.
+- The two `container_name` entries are fixed, so `docker compose -p <other>`
   alone does not isolate a second copy of this stack: remove or parameterise
   those names before running two stacks side by side.
 
@@ -173,7 +168,7 @@ Create a systemd service file at `/etc/systemd/system/sakura-bot.service`:
 ```ini
 [Unit]
 Description=Sakura Spirit Bot
-After=network.target postgresql.service redis.service
+After=network.target postgresql.service
 
 [Service]
 Type=simple
@@ -222,29 +217,18 @@ Treat migration tooling as pending work rather than an available feature.
 
 ### Logging
 
-With Compose the bot writes to the `sakura-bot-logs` volume and Traefik to
-`sakura-proxy-logs`; the `sakura-proxy-logrotate` sidecar rotates both every 15
-minutes. When the bot runs directly on the host instead, logs go to the path in
-`SAKURA_BOT_LOG_FILE` (`logs/sakura_bot.log` by default) and need a host
-logrotate rule:
+The bot writes every record to stdout/stderr: there is no log file, no log volume
+and no logrotate sidecar. Under Compose, Docker captures the stream and rotates it
+with the `json-file` driver (`max-size`/`max-file` in the Compose file):
 
 ```bash
-# Create logrotate config
-sudo nano /etc/logrotate.d/sakura-bot
+docker compose logs -f sakura-bot
 ```
 
-Add:
-
-```
-/home/ubuntu/sakura-spirit-bot/logs/*.log {
-    daily
-    rotate 7
-    compress
-    delaycompress
-    notifempty
-    missingok
-}
-```
+When the bot runs directly on the host, redirect the output of the process to the
+supervisor of your choice (systemd sends it to the journal, readable with
+`sudo journalctl -u sakura-bot -f`). Do not reintroduce an application log file:
+it would bypass the rotation that Docker and the journal already provide.
 
 ### Backup Database
 
@@ -269,17 +253,20 @@ Monitor bot performance:
 
 - CPU and memory usage
 - Database query performance
-- Redis cache hit rates
 - Discord API rate limits
+- `/ready` status and the `checks` block
 
 ## Scaling Considerations
 
 For larger deployments:
 
 1. **Database Connection Pooling**: Already implemented via SQLAlchemy
-2. **Redis Clustering**: For high-traffic servers
-3. **Horizontal Scaling**: Run multiple bot instances with a shared database
-4. **Load Balancing**: Distribute commands across instances
+2. **Horizontal Scaling**: The cache is in-process, so it is not shared between
+   replicas: run a single bot instance per token. Multiple instances would need a
+   shared cache and a shared scheduler, which this project does not implement.
+3. **Database size**: LFG sessions and ritual cooldowns are rows in PostgreSQL;
+   expired LFG sessions can be purged with
+   `core.lfg_repository.purge_expired_sessions` from a maintenance job.
 
 ## Security Best Practices
 
@@ -295,8 +282,7 @@ For larger deployments:
 
 - Check `.env` file is properly configured
 - Verify database connection
-- Ensure Redis is running
-- Check logs for error messages
+- Check logs for error messages (`docker compose logs sakura-bot`)
 
 ### Database Connection Issues
 
@@ -308,15 +294,23 @@ psql -U sakura_user -d sakura_bot -h localhost
 psql -U postgres -c "\\l"
 ```
 
-### Redis Connection Issues
+### Readiness Stays 503
+
+`/ready` returns 503 until the Gateway is connected, the bootstrap is complete,
+PostgreSQL answers a trivial query and every required extension is loaded. Read
+the `checks` block to see which one is false:
 
 ```bash
-# Test Redis connection
-redis-cli ping
-
-# Check Redis status
-sudo systemctl status redis
+docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
 ```
+
+### LFG or Ritual Cooldown Behave Unexpectedly
+
+Both are rows in PostgreSQL (`lfg_sessions`, `lfg_members`,
+`ritual_cooldowns`), not cache entries, so a restart no longer clears them. An
+LFG post expires after one hour and every accepted join renews the window; the
+ritual cooldown lasts 30 minutes per user. Inspect the rows with `psql` before
+changing anything.
 
 ### Permission Issues
 
@@ -363,9 +357,9 @@ Before going live:
 
 - [ ] All environment variables configured
 - [ ] Database properly set up and backed up
-- [ ] Redis running and accessible
+- [ ] `/ready` returns 200 with every check true
 - [ ] Bot tested in a development server
-- [ ] Logging configured
+- [ ] Logging visible through `docker compose logs` (or the journal)
 - [ ] Monitoring set up
 - [ ] Backup strategy in place
 - [ ] Security review completed

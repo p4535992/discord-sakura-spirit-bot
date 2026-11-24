@@ -28,12 +28,9 @@ _CANONICAL_NAMES = (
     "DATABASE_URL",
     "DISCORD_TOKEN",
     "DISCORD_CLIENT_ID",
-    "REDIS_URL",
     "OPENAI_API_KEY",
     "ENVIRONMENT",
     "LOG_LEVEL",
-    "LOG_FILE",
-    "CACHE_REQUIRED",
     "HEALTH_SERVER_ENABLED",
     "STRICT_STARTUP",
     "BOT_PREFIX",
@@ -45,13 +42,10 @@ for _name in _CANONICAL_NAMES:
 os.environ["SAKURA_BOT_DATABASE_URL"] = APPLICATION_DATABASE_PLACEHOLDER
 os.environ["SAKURA_BOT_ENVIRONMENT"] = "test"
 os.environ["SAKURA_BOT_LOG_LEVEL"] = "WARNING"
-os.environ["SAKURA_BOT_LOG_FILE"] = "logs/test.log"
-os.environ["SAKURA_BOT_CACHE_REQUIRED"] = "false"
 os.environ["SAKURA_BOT_HEALTH_SERVER_ENABLED"] = "false"
 os.environ["SAKURA_BOT_STRICT_STARTUP"] = "false"
 os.environ["SAKURA_BOT_DISCORD_TOKEN"] = "test-token"
 os.environ["SAKURA_BOT_DISCORD_CLIENT_ID"] = "123456789012345678"
-os.environ["SAKURA_BOT_REDIS_URL"] = "redis://localhost:6379/15"
 os.environ["SAKURA_BOT_OPENAI_API_KEY"] = "test-openai-key"
 
 import pytest  # noqa: E402
@@ -60,6 +54,28 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 import models  # noqa: E402,F401  # Registers every ORM class on Base.metadata.
 from models.base import Base  # noqa: E402
+
+
+@pytest.fixture
+async def sqlite_session_factory():
+    """Provide a session factory bound to a fresh in-memory SQLite schema.
+
+    Every call returns a new session, so a test can simulate a separate request
+    or a restart of the bot on the same database. SQLite is used only for fast
+    ORM regression tests; PostgreSQL remains the integration target in
+    ``tests/integration``.
+    """
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    yield factory
+
+    await engine.dispose()
 
 
 @pytest.fixture

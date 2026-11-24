@@ -1,5 +1,10 @@
 # sakura-proxy-logrotate
 
+> **Historical material.** This sidecar is no longer part of any active Compose
+> file: the application writes to stdout/stderr and Docker rotates the `json-file`
+> output (`max-size`/`max-file`). The folder is kept only for rollback and for the
+> operator to decide when to remove it.
+
 Log rotation sidecar (`sakura-proxy-logrotate`), built from `Dockerfile` on
 `alpine:3.24.4`.
 
