@@ -279,9 +279,15 @@ mandatory, because a bare `docker compose up` starts the production stack.
 
 The manual Discord setup (new application, token, privileged intents, private
 guild, invite scopes) and the full PowerShell walkthrough are in
-`docs/DISCORD_BETA_GUIDA_WINDOWS.md`. The online verification is **NOT
+`docs/DISCORD_BETA_GUIDE_WINDOWS.md`; the Italian translation is
+`docs/DISCORD_BETA_GUIDE_WINDOWS_it.md`. The online verification is **NOT
 EXECUTED**: it needs a beta token and an explicit authorization to reach
 Discord.
+
+Neither stack is the first step: to exercise the real bot code without any
+Discord account, token or Internet access, run the self-hosted Spacebar beta
+(`docker-compose.spacebar.yml`, guide in `docs/SPACEBAR_BETA.md`). The four test
+levels are summarised at the top of `docs/DISCORD_BETA_GUIDE_WINDOWS.md`.
 
 ## 🤖 Usage
 
