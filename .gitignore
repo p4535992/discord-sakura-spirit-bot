@@ -332,11 +332,6 @@ AGENTS.md
 # Archivi con dati persistenti.
 /backups/
 
-# Prevenire l'aggiunta accidentale di vecchi certificati e chiavi.
-/sakura-proxy/config/cert/*.key
-/sakura-proxy/config/cert/*.crt
-/sakura-proxy/config/cert/*.cer
-
 # Non versionare credenziali JAAS e altri file segreti per servizio.
 **/secrets/**
 **/*_jaas.conf
@@ -358,9 +353,6 @@ AGENTS.md
 **/backups/**
 **/secrets/**
 **/*_jaas.conf
-**/sakura-proxy/config/cert/*.cer
-**/sakura-proxy/config/cert/*.crt
-**/sakura-proxy/config/cert/*.key
 **/.compose-generation.*
 
 # Stack beta Spacebar: configurazione locale e dati di runtime generati.

@@ -138,8 +138,8 @@ Day-to-day commands:
 
 ```bash
 docker compose logs -f sakura-bot
+docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/health').read().decode())"
 docker compose exec sakura-bot python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready').read().decode())"
-curl -k https://localhost/health
 docker compose down          # keeps the named volumes
 ```
 

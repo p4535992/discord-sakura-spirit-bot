@@ -1,11 +1,11 @@
 """Static guard against the infrastructure removed by the cache migration.
 
 The migration replaced Redis with an in-process cache and removed Traefik and
-the logrotate sidecar from the active stacks. The historical folders
-(``sakura-redis/``, ``sakura-proxy/``, ``sakura-proxy-logrotate/``) may still
-exist for rollback, so only the active configuration and the shipped code are
-asserted here. Comment lines are ignored: they may legitimately document what
-was removed.
+the logrotate sidecar from the active stacks. Their source folders
+(``sakura-redis/``, ``sakura-proxy/``, ``sakura-proxy-logrotate/``) were deleted
+once nothing referenced them, so this module asserts both the active
+configuration and the absence of those folders. Comment lines are ignored: they
+may legitimately document what was removed.
 """
 
 import os
@@ -31,6 +31,9 @@ ENV_TEMPLATES = (
     ".env.spacebar.example",
     ".env.sakura-local-test",
 )
+
+# Source folders deleted with the migration: no copy may reappear as a backup.
+REMOVED_FOLDERS = ("sakura-redis", "sakura-proxy", "sakura-proxy-logrotate")
 
 # Built at runtime so this file does not match its own needles.
 REDIS_IMPORT_NEEDLES = ("import " + "redis", "from " + "redis")
@@ -91,3 +94,9 @@ def test_env_templates_do_not_configure_removed_infrastructure():
         text = "\n".join(_active_lines(REPOSITORY_ROOT / name))
         for token in forbidden:
             assert token not in text, f"{name} still configures {token}"
+
+
+def test_removed_infrastructure_folders_are_gone():
+    """The legacy source folders were deleted, not only unwired from Compose."""
+    for name in REMOVED_FOLDERS:
+        assert not (REPOSITORY_ROOT / name).exists(), f"{name} is back in the tree"

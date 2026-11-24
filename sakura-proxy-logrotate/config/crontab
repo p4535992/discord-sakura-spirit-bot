@@ -1,2 +1,0 @@
-# Run rotate_once.sh every 15 minutes; the marker is updated only on success.
-*/15 * * * * /opt/scripts/rotate_once.sh

@@ -343,9 +343,6 @@ This bot is built with a modular architecture, making it easy to extend and add 
 │   ├── pyproject.toml       # Pytest and black configuration
 │   └── .flake8              # Lint configuration
 ├── sakura-postgres/         # PostgreSQL container notes (env-only configuration)
-├── sakura-redis/            # Historical: Redis container, no longer part of the stack
-├── sakura-proxy/            # Historical: Traefik container, no longer part of the stack
-├── sakura-proxy-logrotate/  # Historical: logrotate sidecar, no longer part of the stack
 ├── .env.example             # Environment variable template
 ├── .env.discord-beta.example # Discord beta template (separate app and guild)
 ├── docker-compose.yml       # Bot and PostgreSQL
@@ -362,8 +359,10 @@ Each container has its own folder named after it (`sakura-bot/`,
 short `README.md`. Folder name, compose service name, `container_name` and
 environment prefix always match, so `sakura-postgres` is the `sakura-postgres/`
 folder, the `sakura-postgres` service and the `SAKURA_POSTGRES_*` variables.
-`sakura-redis/`, `sakura-proxy/` and `sakura-proxy-logrotate/` are kept only as
-historical material for rollback: no active Compose file references them.
+The former `sakura-redis/`, `sakura-proxy/` and `sakura-proxy-logrotate/`
+folders were deleted once no active Compose file, Dockerfile or test referenced
+them; the migration notes in `ARCHITECTURE.md` and `DEPLOYMENT.md` describe what
+they used to run.
 `sakura-bot/` also holds the whole application (sources, tests, requirements and
 lint configuration), so it is the build context of the bot image; the repository
 root keeps only the project-level files (Compose, `.env.example`,
