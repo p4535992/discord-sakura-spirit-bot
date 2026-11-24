@@ -10,6 +10,11 @@ from .world import (
     WorldEvent, CodexEntry, ParkZone, NPC, UserZoneProgress,
     Shop, Quest, UserQuest
 )
+from .weather import (
+    WeatherClimatePreset, WeatherChannelConfig, WeatherDailySnapshot,
+    WeatherIntradaySnapshot, WeatherEventTemplate, WeatherEventOccurrence,
+    WeatherMediaAsset, WeatherChannelState, WeatherAuditLog
+)
 
 __all__ = [
     "Base",
@@ -37,4 +42,13 @@ __all__ = [
     "Shop",
     "Quest",
     "UserQuest",
+    "WeatherClimatePreset",
+    "WeatherChannelConfig",
+    "WeatherDailySnapshot",
+    "WeatherIntradaySnapshot",
+    "WeatherEventTemplate",
+    "WeatherEventOccurrence",
+    "WeatherMediaAsset",
+    "WeatherChannelState",
+    "WeatherAuditLog",
 ]

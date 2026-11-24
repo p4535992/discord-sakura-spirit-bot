@@ -1,9 +1,9 @@
 """Regression tests for the versioned climate catalog.
 
 The catalog in ``systems/weather`` is generated from the historical
-``RPG Weather Dnd5e.xlsx`` workbook by ``scripts/extract_weather_workbook.py``.
-The workbook itself is not committed, so these tests validate the committed
-artifact instead of re-reading the spreadsheet:
+``RPG Weather Dnd5e.xlsx`` workbook, which is committed in
+``docs/xlsx/RPG Weather Dnd5e.xlsx``. The tests validate the committed catalog
+artifact and, through ``source.sha256``, the provenance of the workbook:
 
 * the monthly precipitation matrix is the 12x12 table documented in
   ``docs/WEATHER_SOURCE_MAPPING.md`` and read from ``Climates``;
@@ -14,8 +14,10 @@ artifact instead of re-reading the spreadsheet:
   snapshots, so nothing downstream can mistake them for canonical normals.
 """
 
+import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -23,7 +25,15 @@ import pytest
 CATALOG_PATH = (
     Path(__file__).resolve().parents[2] / "systems" / "weather" / "climate_catalog.json"
 )
-EXTRACTOR_PATH = Path(__file__).resolve().parents[3] / "scripts" / "extract_weather_workbook.py"
+# The extractor lives outside the application package. The Docker test runner
+# mounts the clone (or the ``scripts`` folder) under ``SAKURA_REPOSITORY_ROOT``,
+# so the same expression resolves on the host and inside the container instead
+# of pointing at a non-existent ``/scripts`` path.
+REPOSITORY_ROOT = Path(
+    os.environ.get("SAKURA_REPOSITORY_ROOT") or Path(__file__).resolve().parents[3]
+)
+EXTRACTOR_PATH = REPOSITORY_ROOT / "scripts" / "extract_weather_workbook.py"
+WORKBOOK_PATH = REPOSITORY_ROOT / "docs" / "xlsx" / "RPG Weather Dnd5e.xlsx"
 
 # ``Climates!I3:I14`` and the equivalent ``Precip`` column of the other eleven
 # climate blocks, expressed as percentages for readability.
@@ -215,7 +225,23 @@ def test_randomized_fields_are_declared_as_snapshots(catalog):
     assert "climates[].months[].precipitation_probability" not in randomized
 
 
+def test_extractor_is_available_where_the_tests_run():
+    """The Docker runner must mount ``scripts/``: a missing path is a failure."""
+    assert EXTRACTOR_PATH.is_file(), f"extractor not found at {EXTRACTOR_PATH}"
+
+
+def test_committed_workbook_matches_the_catalog_digest(catalog):
+    """The workbook is versioned: its bytes must still match ``source.sha256``."""
+    assert WORKBOOK_PATH.is_file(), f"workbook not found at {WORKBOOK_PATH}"
+
+    digest = hashlib.sha256(WORKBOOK_PATH.read_bytes()).hexdigest()
+
+    assert digest == catalog["source"]["sha256"]
+    assert WORKBOOK_PATH.stat().st_size == catalog["source"]["size_bytes"]
+
+
 def test_extractor_parses_open_ended_mph_ranges():
+    """The extractor reads the workbook's en-dash ranges, including ``<1``."""
     spec = importlib.util.spec_from_file_location("extract_weather_workbook", EXTRACTOR_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -226,5 +252,3 @@ def test_extractor_parses_open_ended_mph_ranges():
 
     with pytest.raises(ValueError):
         module.parse_mph_range("strong")
-
-

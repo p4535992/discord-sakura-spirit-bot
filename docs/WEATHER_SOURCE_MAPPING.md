@@ -6,9 +6,11 @@ verificata sul clone locale alla revisione `acf29923d97aef786678348bc634daddf48f
 accompagna il catalogo versionato
 `sakura-bot/systems/weather/climate_catalog.json`.
 
-Il file `.xlsx` **non è versionato nel repository**: il catalogo viene generato
-una volta con `scripts/extract_weather_workbook.py` e il JSON risultante è
-l'artefatto che i test e il codice leggono.
+Il file `.xlsx` **è versionato nel repository**, in `docs/xlsx/RPG Weather Dnd5e.xlsx`
+(324.931 byte, SHA-256 `accc79fb…098515`): il catalogo viene generato con
+`scripts/extract_weather_workbook.py` e il JSON risultante è l'artefatto che i
+test e il codice leggono a runtime. Il workbook resta la fonte verificabile per
+ricontrollare la mappatura, non un input del motore.
 
 ## Stato della verifica
 
@@ -291,10 +293,10 @@ tolleranza di 0,05 °C per non dipendere dall'arrotondamento.
 
 ## Rigenerare il catalogo
 
-Dalla radice del repository, con il workbook disponibile localmente:
+Dalla radice del repository, con il workbook versionato nel progetto:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\extract_weather_workbook.py --source "<percorso>\RPG Weather Dnd5e.xlsx"
+.\.venv\Scripts\python.exe scripts\extract_weather_workbook.py --source "docs\xlsx\RPG Weather Dnd5e.xlsx"
 ```
 
 Lo script usa solo la libreria standard, non richiede `openpyxl` e scrive
@@ -337,7 +339,9 @@ cd sakura-bot
 
 ## Limiti
 
-- Il workbook non è versionato: i test validano il catalogo, non il file.
+- Il workbook è versionato in `docs/xlsx/RPG Weather Dnd5e.xlsx`; i test validano
+  il catalogo generato, ma `source.sha256` permette di verificare che il file
+  committato sia ancora quello da cui il catalogo è stato estratto.
 - I valori `cold_f`/`avg_f`/`hot_f` sono una fotografia e non vanno usati come
   normali climatiche in una validazione scientifica.
 - Le frequenze osservate di vento, direzione e fenomeni non sono riproducibili.

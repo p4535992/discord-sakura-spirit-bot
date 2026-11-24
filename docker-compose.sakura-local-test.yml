@@ -75,18 +75,32 @@ services:
       SAKURA_BOT_HEALTH_SERVER_ENABLED: "false"
       SAKURA_BOT_STRICT_STARTUP: "false"
       # Root of the clone for the tests that assert the repository-level files
-      # (Compose stacks, .env templates, .gitignore). Only those files are
-      # mounted, so no local secret file is exposed to the container.
+      # (Compose stacks, .env templates, .gitignore, the weather extractor and
+      # the workbook). Only those files are mounted, so no local secret file is
+      # exposed to the container.
       SAKURA_REPOSITORY_ROOT: /repository
+      # The container sees a partial tree, so the test that asserts the absence
+      # of the removed legacy folders skips here and runs on the host clone.
+      SAKURA_REPOSITORY_PARTIAL_MOUNT: "1"
     volumes:
       # The tests always come from the clone under validation, read-only.
       # PYTHONDONTWRITEBYTECODE keeps pytest from writing bytecode there.
       - ./sakura-bot/tests:/app/tests:ro
-      # Repository-level files asserted by
-      # tests/unit/test_discord_beta_configuration.py.
+      # Repository-level files asserted by the tests. Every path that a test
+      # reads must be mounted explicitly: a missing mount is a failure, not a
+      # silent pass.
+      - ./docker-compose.yml:/repository/docker-compose.yml:ro
       - ./docker-compose.discord-beta.yml:/repository/docker-compose.discord-beta.yml:ro
+      - ./docker-compose.spacebar.yml:/repository/docker-compose.spacebar.yml:ro
+      - ./docker-compose.sakura-local-test.yml:/repository/docker-compose.sakura-local-test.yml:ro
+      - ./.env.example:/repository/.env.example:ro
       - ./.env.discord-beta.example:/repository/.env.discord-beta.example:ro
+      - ./.env.spacebar.example:/repository/.env.spacebar.example:ro
+      - ./.env.sakura-local-test:/repository/.env.sakura-local-test:ro
       - ./.gitignore:/repository/.gitignore:ro
+      # The weather tests import the extractor and verify the workbook digest.
+      - ./scripts:/repository/scripts:ro
+      - ./docs/xlsx:/repository/docs/xlsx:ro
     working_dir: /app
     command: ["python", "-m", "pytest", "-v"]
     security_opt:

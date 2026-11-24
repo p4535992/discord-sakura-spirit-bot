@@ -11,6 +11,8 @@ may legitimately document what was removed.
 import os
 from pathlib import Path
 
+import pytest
+
 # The Docker test runner mounts only the repository files it needs, so the clone
 # root is passed explicitly there; on the host it is derived from this file.
 REPOSITORY_ROOT = Path(
@@ -97,6 +99,13 @@ def test_env_templates_do_not_configure_removed_infrastructure():
 
 
 def test_removed_infrastructure_folders_are_gone():
-    """The legacy source folders were deleted, not only unwired from Compose."""
+    """The legacy source folders were deleted, not only unwired from Compose.
+
+    The Docker test runner mounts only the files it asserts, so a missing folder
+    there proves nothing: the check is skipped instead of reporting a false pass.
+    """
+    if os.environ.get("SAKURA_REPOSITORY_PARTIAL_MOUNT") == "1":
+        pytest.skip("the test container mounts a partial tree, not the whole clone")
+
     for name in REMOVED_FOLDERS:
         assert not (REPOSITORY_ROOT / name).exists(), f"{name} is back in the tree"
